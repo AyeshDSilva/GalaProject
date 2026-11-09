@@ -34,7 +34,8 @@ public sealed partial class ProcessedGuestListParser
     private static readonly string[] RequiredHeaders =
     [
         .. EventDays.All.Select(d => d.ProcessedHeader),
-        Headers.FirstName, Headers.Surname, Headers.GuestName, Headers.Position, Headers.Phone, Headers.Email1,
+        Headers.Prenom, Headers.FirstName, Headers.Surname, Headers.Postnom, Headers.GuestName, Headers.Position,
+        Headers.Phone, Headers.Email1,
     ];
 
     public ParseResult Parse(Stream stream)
@@ -65,6 +66,7 @@ public sealed partial class ProcessedGuestListParser
         var firstNameColumn = map.Find(Headers.FirstName);
         var surnameColumn = map.Find(Headers.Surname);
         var prenomColumn = map.Find(Headers.Prenom);
+        var postnomColumn = map.Find(Headers.Postnom);
         var guestNameColumn = map.Find(Headers.GuestName);
         var positionColumn = map.Find(Headers.Position);
         var phoneColumn = map.Find(Headers.Phone);
@@ -101,7 +103,9 @@ public sealed partial class ProcessedGuestListParser
             {
                 DisplayName = NameNormalizer.CleanDisplay($"{NameNormalizer.StripTitles(firstName)} {surname}"),
                 MatchKey = matchKey,
-                Title = NullIfEmpty(Cell(prenomColumn)),
+                Title = TextNormalizer.Clean(Cell(prenomColumn)),
+                PostNominal = TextNormalizer.Clean(Cell(postnomColumn)),
+                Position = TextNormalizer.Clean(Cell(positionColumn)),
             };
             record.Rows.Add(new RowReference(sheet.Name, rowNumber));
 
@@ -110,7 +114,7 @@ public sealed partial class ProcessedGuestListParser
                 var raw = Cell(column);
                 if (!TryParseDayCell(raw, out var state))
                 {
-                    warnings.Add(new(WarningFile, $"{sheet.Name} row {rowNumber}: '{raw}' under {info.ProcessedHeader} for {record.DisplayName} isn't Y, N or a number. Treated as no response."));
+                    warnings.Add(new(WarningFile, $"{sheet.Name} row {rowNumber}: '{raw}' under {info.ProcessedHeader} for {record.DisplayName} isn't Y, N or 1. Treated as not invited."));
                 }
 
                 record.Attendance[info.Day] = state;
@@ -164,11 +168,14 @@ public sealed partial class ProcessedGuestListParser
         return new ParseResult(records, warnings);
     }
 
-    /// <summary>Y or a positive number = attending, N = not attending, blank = no response.</summary>
+    /// <summary>
+    /// Y = invited and coming, N = invited and not coming, 1 = invited with no response yet, blank = not invited.
+    /// Anything else is also treated as not invited, and returns false so it can be flagged.
+    /// </summary>
     public static bool TryParseDayCell(string? value, out AttendanceState state)
     {
         var text = value?.Trim() ?? "";
-        state = AttendanceState.NoResponse;
+        state = AttendanceState.NotInvited;
 
         if (text.Length == 0)
         {
@@ -187,14 +194,17 @@ public sealed partial class ProcessedGuestListParser
             return true;
         }
 
-        if (decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var number))
+        if (decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var number) && number == 1)
         {
-            state = number > 0 ? AttendanceState.Attending : AttendanceState.NotAttending;
+            state = AttendanceState.AwaitingResponse;
             return true;
         }
 
         return false;
     }
+
+    /// <summary>True for a Position like "Guest of Mr Marco Bellini": a link to the host, not a job title.</summary>
+    public static bool IsHostLink(string? position) => position is not null && GuestOf().IsMatch(position);
 
     private static void LinkGuests(
         List<GuestRecord> records,
@@ -268,6 +278,8 @@ public sealed partial class ProcessedGuestListParser
         target.Phones.UnionWith(duplicate.Phones);
         target.Emails.UnionWith(duplicate.Emails);
         target.Title ??= duplicate.Title;
+        target.PostNominal ??= duplicate.PostNominal;
+        target.Position ??= duplicate.Position;
         if (target.HostMatchKey is null)
         {
             target.HostMatchKey = duplicate.HostMatchKey;
@@ -276,7 +288,7 @@ public sealed partial class ProcessedGuestListParser
 
         foreach (var (day, state) in duplicate.Attendance)
         {
-            // Attending beats not attending beats no response (enum order).
+            // Attending beats not attending beats invited/no response beats not invited (enum order).
             if (state < target.GetAttendance(day))
             {
                 target.Attendance[day] = state;
@@ -289,8 +301,6 @@ public sealed partial class ProcessedGuestListParser
             .Select(NameNormalizer.CleanDisplay)
             .Where(line => line.Length > 0)
             .ToList();
-
-    private static string? NullIfEmpty(string value) => value.Length == 0 ? null : value;
 
     [GeneratedRegex(@"^\s*guest\s+of\s+(.+?)\s*$", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex GuestOf();

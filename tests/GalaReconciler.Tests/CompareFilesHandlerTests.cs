@@ -1,6 +1,6 @@
+using GalaReconciler.Core;
 using GalaReconciler.Core.Domain;
 using GalaReconciler.Core.Matching;
-using GalaReconciler.Core;
 using GalaReconciler.Tests.Helpers;
 using GalaReconciler.Web.Features.Reconciliation;
 
@@ -28,36 +28,65 @@ public class CompareFilesHandlerTests
     }
 
     [Fact]
-    public void Leilani_has_only_a_mobile_mismatch_and_is_marcos_guest()
+    public void Leilani_has_a_mobile_and_a_title_mismatch_but_her_guest_of_position_is_skipped()
     {
-        var discrepancy = Assert.Single(For("Leilani Fonua"));
-        Assert.Equal(DiscrepancyType.MobileNumberMismatch, discrepancy.Type);
-        Assert.Equal("Only in Source: 0491570158", discrepancy.Detail);
-        Assert.Equal("Marco Bellini", discrepancy.HostDisplayName);
+        Assert.Equal([DiscrepancyType.MobileNumberMismatch, DiscrepancyType.TitleMismatch], TypesFor("Leilani Fonua"));
+
+        var mobile = For("Leilani Fonua").Single(d => d.Type == DiscrepancyType.MobileNumberMismatch);
+        Assert.Equal("Only in Source: 0491570158", mobile.Detail);
+        Assert.Equal("Marco Bellini", mobile.HostDisplayName);
+
+        // "Please specify your title" (Dr) wins over Title (Other).
+        var title = For("Leilani Fonua").Single(d => d.Type == DiscrepancyType.TitleMismatch);
+        Assert.Equal("Dr", title.SourceValue);
+        Assert.Equal("Ms", title.ProcessedValue);
     }
 
     [Fact]
     public void Alice_has_no_discrepancies() => Assert.Empty(For("Alice Romano"));
 
     [Fact]
-    public void Olivia_matches_by_name_with_only_an_email_mismatch()
+    public void Olivia_matches_by_name_with_an_email_and_a_post_nominal_mismatch()
     {
-        var discrepancy = Assert.Single(For("Olivia Grant-Taylor"));
-        Assert.Equal(DiscrepancyType.EmailMismatch, discrepancy.Type);
-        Assert.Equal(MatchMethod.Name, discrepancy.MatchedBy);
-        Assert.Equal("Olivia Grant Taylor", discrepancy.SourceDisplayName);
+        Assert.Equal([DiscrepancyType.EmailMismatch, DiscrepancyType.PostNominalMismatch], TypesFor("Olivia Grant-Taylor"));
+
+        var email = For("Olivia Grant-Taylor").Single(d => d.Type == DiscrepancyType.EmailMismatch);
+        Assert.Equal(MatchMethod.Name, email.MatchedBy);
+        Assert.Equal("Olivia Grant Taylor", email.SourceDisplayName);
+
+        var postNominal = For("Olivia Grant-Taylor").Single(d => d.Type == DiscrepancyType.PostNominalMismatch);
+        Assert.Equal("OAM", postNominal.SourceValue);
+        Assert.Equal("AM", postNominal.ProcessedValue);
     }
 
     [Fact]
-    public void Ethan_has_email_missing_in_source_and_a_grid_gala_dates_mismatch()
+    public void Ethan_has_email_missing_in_source_and_his_grid_gala_1_matches_having_no_ticket()
     {
-        Assert.Equal([DiscrepancyType.DatesMismatch, DiscrepancyType.EmailMismatch], TypesFor("Ethan Cole"));
-
-        var email = For("Ethan Cole").Single(d => d.Type == DiscrepancyType.EmailMismatch);
+        var email = Assert.Single(For("Ethan Cole"));
+        Assert.Equal(DiscrepancyType.EmailMismatch, email.Type);
         Assert.Equal("Missing in Source", email.Detail);
+    }
 
-        var dates = For("Ethan Cole").Single(d => d.Type == DiscrepancyType.DatesMismatch);
-        Assert.Equal([EventDay.GridGala], dates.AffectedDays);
+    [Fact]
+    public void Clara_is_attending_but_still_marked_1_in_the_master_list()
+    {
+        var dates = Assert.Single(For("Clara Walsh"));
+        Assert.Equal(DiscrepancyType.DatesMismatch, dates.Type);
+        var gala = Assert.Single(dates.Days, d => d.IsDifferent);
+        Assert.Equal(EventDay.GridGala, gala.Day);
+        Assert.Equal(AttendanceState.Attending, gala.Source);
+        Assert.Equal(AttendanceState.AwaitingResponse, gala.Processed);
+    }
+
+    [Fact]
+    public void Henry_has_a_position_mismatch_and_oscars_nil_position_is_left_alone()
+    {
+        var position = Assert.Single(For("Henry Walsh"));
+        Assert.Equal(DiscrepancyType.PositionMismatch, position.Type);
+        Assert.Equal("Managing Director", position.SourceValue);
+        Assert.Equal("Director", position.ProcessedValue);
+
+        Assert.Empty(For("Oscar Reid"));
     }
 
     [Fact]
@@ -85,11 +114,10 @@ public class CompareFilesHandlerTests
     }
 
     [Fact]
-    public void Shared_phone_and_multi_line_phone_guests_have_no_discrepancies()
+    public void Shared_and_multi_line_phones_cause_no_mobile_mismatch()
     {
-        Assert.Empty(For("Oscar Reid"));
-        Assert.Empty(For("Henry Walsh"));
-        Assert.Empty(For("Clara Walsh"));
+        Assert.DoesNotContain(Result.Discrepancies, d => d.Type == DiscrepancyType.MobileNumberMismatch
+            && d.GuestDisplayName is "Oscar Reid" or "Henry Walsh" or "Clara Walsh" or "Felix Moreau");
         Assert.Empty(For("Felix Moreau"));
     }
 
@@ -121,17 +149,18 @@ public class CompareFilesHandlerTests
     [Fact]
     public void Totals_and_ordering()
     {
-        Assert.Equal(10, Result.Discrepancies.Count);
+        Assert.Equal(13, Result.Discrepancies.Count);
         Assert.Equal(14, Result.SourceGuestCount);
         Assert.Equal(14, Result.ProcessedGuestCount);
         Assert.Equal(12, Result.MatchedCount);
 
-        // Ordered by name, with each guest grouped under their host: Leilani comes straight after Marco,
-        // and Maeve sorts where her host Oscar Reid would.
+        // Ordered by name, with each guest grouped under their host (Clara after Henry, Leilani after Marco,
+        // Maeve where Oscar Reid would be), then by type.
         Assert.Equal(
             [
-                "Ethan Cole", "Ethan Cole", "Marco Bellini", "Leilani Fonua", "Olivia Grant-Taylor",
-                "Maeve O'Connell", "Ruby Macintyre", "Ruby McIntyre", "Sam Fletcher", "William Hartley",
+                "Ethan Cole", "Henry Walsh", "Clara Walsh", "Marco Bellini", "Leilani Fonua", "Leilani Fonua",
+                "Olivia Grant-Taylor", "Olivia Grant-Taylor", "Maeve O'Connell", "Ruby Macintyre", "Ruby McIntyre",
+                "Sam Fletcher", "William Hartley",
             ],
             Result.Discrepancies.Select(d => d.GuestDisplayName));
     }

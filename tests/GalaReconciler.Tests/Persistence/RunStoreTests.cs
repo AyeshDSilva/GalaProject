@@ -1,9 +1,9 @@
-using GalaReconciler.Core.Domain;
 using GalaReconciler.Core;
+using GalaReconciler.Core.Domain;
 using GalaReconciler.Tests.Helpers;
+using GalaReconciler.Web.Features.Reconciliation;
 using GalaReconciler.Web.Features.Reconciliation.Background;
 using GalaReconciler.Web.Features.Reconciliation.Persistence;
-using GalaReconciler.Web.Features.Reconciliation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -43,6 +43,10 @@ public sealed class RunStoreTests : IDisposable
         Assert.Equal(RunStatus.Completed, run.Status);
         Assert.Equal(4, run.GuestNotFoundCount);
         Assert.Equal(2, run.DatesMismatchCount);
+        Assert.Equal(1, run.TitleMismatchCount);
+        Assert.Equal(1, run.PostNominalMismatchCount);
+        Assert.Equal(1, run.PositionMismatchCount);
+        Assert.Equal(13, run.DiscrepancyCount);
         Assert.Equal(2, run.MobileNumberMismatchCount);
         Assert.Equal(2, run.EmailMismatchCount);
         Assert.Equal(1, run.WarningCount);

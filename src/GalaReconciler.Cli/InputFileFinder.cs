@@ -30,7 +30,7 @@ public sealed class InputFileException(string message) : Exception(message);
 /// <summary>Finds the RSVP export and the master guest list in a folder by looking at their headers.</summary>
 public static class InputFileFinder
 {
-    /// <summary>Reports this app writes; skipped when searching so a re-run doesn't trip over them.</summary>
+    /// <summary>Files this app writes start with this; they (and highlighted copies) are skipped when searching.</summary>
     public const string ReportFilePrefix = "GALA Reconciliation";
 
     public static InputFiles Find(string folder)
@@ -41,7 +41,8 @@ public static class InputFileFinder
                 var name = Path.GetFileName(path);
                 // "~$…" files are Excel's lock files for workbooks that are open.
                 return !name.StartsWith("~$", StringComparison.Ordinal)
-                    && !name.StartsWith(ReportFilePrefix, StringComparison.OrdinalIgnoreCase);
+                    && !name.StartsWith(ReportFilePrefix, StringComparison.OrdinalIgnoreCase)
+                    && !Path.GetFileNameWithoutExtension(name).EndsWith(OutputPaths.HighlightedSuffix, StringComparison.OrdinalIgnoreCase);
             })
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToList();

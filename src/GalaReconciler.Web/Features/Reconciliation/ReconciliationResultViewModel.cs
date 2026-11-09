@@ -1,5 +1,5 @@
-using GalaReconciler.Core.Domain;
 using GalaReconciler.Core;
+using GalaReconciler.Core.Domain;
 
 namespace GalaReconciler.Web.Features.Reconciliation;
 

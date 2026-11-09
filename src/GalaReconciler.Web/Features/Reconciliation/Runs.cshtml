@@ -19,7 +19,10 @@
         DiscrepancyType.GuestNotFound => "bg-rose-50 text-rose-700",
         DiscrepancyType.DatesMismatch => "bg-amber-50 text-amber-800",
         DiscrepancyType.MobileNumberMismatch => "bg-sky-50 text-sky-700",
-        _ => "bg-violet-50 text-violet-700",
+        DiscrepancyType.EmailMismatch => "bg-violet-50 text-violet-700",
+        DiscrepancyType.TitleMismatch => "bg-teal-50 text-teal-700",
+        DiscrepancyType.PostNominalMismatch => "bg-fuchsia-50 text-fuchsia-700",
+        _ => "bg-orange-50 text-orange-700",
     };
 }
 

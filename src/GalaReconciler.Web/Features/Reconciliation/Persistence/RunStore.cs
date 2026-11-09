@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using GalaReconciler.Core.Domain;
 using GalaReconciler.Core;
+using GalaReconciler.Core.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace GalaReconciler.Web.Features.Reconciliation.Persistence;
@@ -56,6 +56,9 @@ public sealed class RunStore(ReconciliationDbContext db, TimeProvider timeProvid
         run.DatesMismatchCount = result.Discrepancies.Count(d => d.Type == DiscrepancyType.DatesMismatch);
         run.MobileNumberMismatchCount = result.Discrepancies.Count(d => d.Type == DiscrepancyType.MobileNumberMismatch);
         run.EmailMismatchCount = result.Discrepancies.Count(d => d.Type == DiscrepancyType.EmailMismatch);
+        run.TitleMismatchCount = result.Discrepancies.Count(d => d.Type == DiscrepancyType.TitleMismatch);
+        run.PostNominalMismatchCount = result.Discrepancies.Count(d => d.Type == DiscrepancyType.PostNominalMismatch);
+        run.PositionMismatchCount = result.Discrepancies.Count(d => d.Type == DiscrepancyType.PositionMismatch);
         run.WarningCount = result.Warnings.Count;
 
         run.Discrepancies.AddRange(result.Discrepancies.Select((d, index) => new RunDiscrepancy
@@ -139,6 +142,9 @@ public sealed class RunStore(ReconciliationDbContext db, TimeProvider timeProvid
             DiscrepancyType.DatesMismatch => query.Where(r => r.DatesMismatchCount > 0),
             DiscrepancyType.MobileNumberMismatch => query.Where(r => r.MobileNumberMismatchCount > 0),
             DiscrepancyType.EmailMismatch => query.Where(r => r.EmailMismatchCount > 0),
+            DiscrepancyType.TitleMismatch => query.Where(r => r.TitleMismatchCount > 0),
+            DiscrepancyType.PostNominalMismatch => query.Where(r => r.PostNominalMismatchCount > 0),
+            DiscrepancyType.PositionMismatch => query.Where(r => r.PositionMismatchCount > 0),
             _ => query,
         };
 

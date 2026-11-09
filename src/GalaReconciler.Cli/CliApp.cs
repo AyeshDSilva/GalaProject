@@ -53,18 +53,22 @@ public sealed class CliApp(CompareFilesHandler handler, TextWriter output)
             using var processed = new MemoryStream(inputs.Processed.Contents, writable: false);
             var result = handler.Handle(new CompareFilesRequest(source, inputs.Source.Name, processed, inputs.Processed.Name));
 
-            var reportPath = ReportPath(options.Output, currentDirectory, folder, result.RunAt);
+            // Two new files; the originals are only ever read.
+            var paths = OutputPaths.For(options.Output, currentDirectory, folder, result.RunAt, inputs.Processed.Name);
+            int highlightedCells;
             try
             {
-                ExcelReportWriter.Write(result, reportPath);
+                highlightedCells = ProcessedFileHighlighter.Write(inputs.Processed.Contents, result, paths.HighlightedCopy);
+                ExcelReportWriter.Write(result, paths.Results, Path.GetFileName(paths.HighlightedCopy));
             }
             catch (IOException ex)
             {
                 throw new InputFileException(
-                    $"Couldn't save the report to {reportPath}.\nIf a file with that name is open in Excel, close it and try again. ({ex.Message})");
+                    $"Couldn't save the output files in {Path.GetDirectoryName(paths.Results)}.\n" +
+                    $"If a file with the same name is open in Excel, close it and try again. ({ex.Message})");
             }
 
-            WriteSummary(result, reportPath);
+            WriteSummary(result, paths, highlightedCells);
             return ExitCodes.Success;
         }
         catch (InputFileException ex)
@@ -92,30 +96,6 @@ public sealed class CliApp(CompareFilesHandler handler, TextWriter output)
         }
     }
 
-    /// <summary>Default "GALA Reconciliation 2026-11-09 1430.xlsx", never overwriting an existing report.</summary>
-    public static string ReportPath(string? requested, string currentDirectory, string folder, DateTimeOffset runAt)
-    {
-        var defaultName = $"{InputFileFinder.ReportFilePrefix} {runAt:yyyy-MM-dd HHmm}.xlsx";
-
-        if (requested is not null)
-        {
-            var full = Path.GetFullPath(requested, currentDirectory);
-            if (!Directory.Exists(full))
-            {
-                return Path.HasExtension(full) ? full : full + ".xlsx";
-            }
-
-            folder = full;
-        }
-
-        var path = Path.Combine(folder, defaultName);
-        for (var copy = 2; File.Exists(path); copy++)
-        {
-            path = Path.Combine(folder, $"{Path.GetFileNameWithoutExtension(defaultName)} ({copy}).xlsx");
-        }
-
-        return path;
-    }
 
     private InputFiles FindInFolder(string folder)
     {
@@ -146,7 +126,7 @@ public sealed class CliApp(CompareFilesHandler handler, TextWriter output)
         return new InputFiles(source, processed);
     }
 
-    private void WriteSummary(ReconciliationResult result, string reportPath)
+    private void WriteSummary(ReconciliationResult result, OutputPaths paths, int highlightedCells)
     {
         output.WriteLine();
         output.WriteLine($"  Guests: {result.SourceGuestCount} in Source, {result.ProcessedGuestCount} in Processed, {result.MatchedCount} matched");
@@ -166,6 +146,47 @@ public sealed class CliApp(CompareFilesHandler handler, TextWriter output)
         }
 
         output.WriteLine();
-        output.WriteLine($"Report saved: {reportPath}");
+        output.WriteLine($"Results saved:           {paths.Results}");
+        output.WriteLine($"Highlighted master list: {paths.HighlightedCopy}");
+        output.WriteLine($"  ({highlightedCells} {(highlightedCells == 1 ? "cell" : "cells")} highlighted; the original files were not changed)");
+    }
+}
+
+/// <summary>Where the results workbook and the highlighted copy of the master list are saved.</summary>
+public sealed record OutputPaths(string Results, string HighlightedCopy)
+{
+    public const string HighlightedSuffix = "(highlighted)";
+
+    /// <summary>
+    /// Default "GALA Reconciliation 2026-11-09 1430.xlsx" and "GALA Reconciliation 2026-11-09 1430 - Master list
+    /// (highlighted).xlsx" in the folder, numbered "(2)", "(3)"… rather than overwriting earlier runs.
+    /// </summary>
+    /// <param name="requested">--output: the results file, or a folder to put both files in.</param>
+    public static OutputPaths For(string? requested, string currentDirectory, string folder, DateTimeOffset runAt, string processedFileName)
+    {
+        var processedName = Path.GetFileNameWithoutExtension(processedFileName);
+        OutputPaths Named(string directory, string stem) =>
+            new(Path.Combine(directory, $"{stem}.xlsx"), Path.Combine(directory, $"{stem} - {processedName} {HighlightedSuffix}.xlsx"));
+
+        if (requested is not null)
+        {
+            var full = Path.GetFullPath(requested, currentDirectory);
+            if (!Directory.Exists(full))
+            {
+                // An explicit file name is used as given.
+                return Named(Path.GetDirectoryName(full)!, Path.HasExtension(full) ? Path.GetFileNameWithoutExtension(full) : Path.GetFileName(full));
+            }
+
+            folder = full;
+        }
+
+        var stem = $"{InputFileFinder.ReportFilePrefix} {runAt:yyyy-MM-dd HHmm}";
+        var paths = Named(folder, stem);
+        for (var copy = 2; File.Exists(paths.Results) || File.Exists(paths.HighlightedCopy); copy++)
+        {
+            paths = Named(folder, $"{stem} ({copy})");
+        }
+
+        return paths;
     }
 }

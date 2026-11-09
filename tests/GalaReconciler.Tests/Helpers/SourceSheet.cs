@@ -5,6 +5,14 @@ public sealed record SourceTicket(string TicketType, string FirstName, string La
 {
     public string? Title { get; init; }
 
+    public string? TitleOther { get; init; }
+
+    public string? PostNominal { get; init; }
+
+    public string? PostNominalOther { get; init; }
+
+    public string? PositionTitle { get; init; }
+
     public object? Mobile { get; init; }
 
     public object? Telephone { get; init; }
@@ -64,6 +72,9 @@ public static class SourceSheet
         Set("Buyer mobile", ticket.BuyerMobile);
         Set("Buyer email", ticket.BuyerEmail);
         Set("Title", ticket.Title);
+        Set("Please specify your title", ticket.TitleOther);
+        Set("Post nominal", ticket.PostNominal);
+        Set("Please specify your post nominal", ticket.PostNominalOther);
         if (!ticket.AttendeeNameBlank)
         {
             Set("First Name", ticket.FirstName);
@@ -73,6 +84,7 @@ public static class SourceSheet
         Set("Mobile", ticket.Mobile);
         Set("Telephone", ticket.Telephone);
         Set("Email", ticket.Email);
+        Set("Position title", ticket.PositionTitle);
         return row;
     }
 

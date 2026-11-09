@@ -1,6 +1,6 @@
+using GalaReconciler.Core;
 using GalaReconciler.Core.Domain;
 using GalaReconciler.Core.Rules;
-using GalaReconciler.Core;
 using Microsoft.Extensions.Options;
 using static GalaReconciler.Tests.Helpers.TestGuests;
 
@@ -30,6 +30,8 @@ public class DatesMismatchRuleTests
         var processed = Guest("A",
             (EventDay.Thursday, AttendanceState.Attending),
             (EventDay.Friday, AttendanceState.NotAttending),
+            (EventDay.Saturday, AttendanceState.NotInvited),
+            (EventDay.Sunday, AttendanceState.NotInvited),
             (EventDay.GridGala, AttendanceState.Attending));
 
         var discrepancy = Rule().Evaluate(Pair(source, processed));
@@ -39,28 +41,100 @@ public class DatesMismatchRuleTests
         Assert.Equal([EventDay.Friday, EventDay.Saturday, EventDay.GridGala], discrepancy.AffectedDays);
         Assert.Equal(5, discrepancy.Days.Count);
         Assert.Equal("Differs on Fri, Sat, Gala", discrepancy.Detail);
-        Assert.Equal("Fri: Attending\nSat: Attending\nGala: No response", discrepancy.SourceValue);
-        Assert.Equal("Fri: Not attending\nSat: No response\nGala: Attending", discrepancy.ProcessedValue);
+        Assert.Equal("Fri: Attending\nSat: Attending\nGala: No RSVP", discrepancy.SourceValue);
+        Assert.Equal("Fri: Not attending\nSat: Not invited\nGala: Attending", discrepancy.ProcessedValue);
+    }
+
+    /// <summary>
+    /// Master list: Y = Attending, N = NotAttending, 1 = AwaitingResponse, blank = NotInvited.
+    /// Export: a ticket "attending" / "not attending", or no ticket (NoResponse).
+    /// </summary>
+    [Theory]
+    [InlineData(AttendanceState.Attending, AttendanceState.Attending, false)]
+    [InlineData(AttendanceState.Attending, AttendanceState.NotAttending, true)]
+    [InlineData(AttendanceState.Attending, AttendanceState.AwaitingResponse, true)] // coming, but still marked 1
+    [InlineData(AttendanceState.Attending, AttendanceState.NotInvited, true)]
+    [InlineData(AttendanceState.NotAttending, AttendanceState.NotAttending, false)]
+    [InlineData(AttendanceState.NotAttending, AttendanceState.AwaitingResponse, true)] // declined, but still marked 1
+    [InlineData(AttendanceState.NotAttending, AttendanceState.NotInvited, true)]
+    [InlineData(AttendanceState.NotAttending, AttendanceState.Attending, true)]
+    [InlineData(AttendanceState.NoResponse, AttendanceState.NotInvited, false)]
+    [InlineData(AttendanceState.NoResponse, AttendanceState.AwaitingResponse, false)]  // no ticket yet = no response yet
+    [InlineData(AttendanceState.NoResponse, AttendanceState.Attending, true)]
+    [InlineData(AttendanceState.NoResponse, AttendanceState.NotAttending, false)]     // may have declined outside ticketing
+    public void Compares_each_day_by_the_master_list_meaning(AttendanceState source, AttendanceState processed, bool differs)
+    {
+        var discrepancy = Rule().Evaluate(Pair(Guest("A", (EventDay.Saturday, source)), Guest("A", (EventDay.Saturday, processed))));
+
+        Assert.Equal(differs, discrepancy is not null);
     }
 
     [Fact]
-    public void Not_attending_and_no_response_are_equivalent_by_default()
+    public void Strict_option_flags_no_ticket_against_not_attending()
     {
-        var source = Guest("A", (EventDay.Saturday, AttendanceState.NotAttending));
-        var processed = Guest("A");
-
-        Assert.Null(Rule().Evaluate(Pair(source, processed)));
-    }
-
-    [Fact]
-    public void Strict_option_flags_not_attending_versus_no_response()
-    {
-        var source = Guest("A", (EventDay.Saturday, AttendanceState.NotAttending));
-        var processed = Guest("A");
+        var source = Guest("A");
+        var processed = Guest("A", (EventDay.Saturday, AttendanceState.NotAttending));
 
         var discrepancy = Rule(strict: true).Evaluate(Pair(source, processed));
         Assert.NotNull(discrepancy);
         Assert.Equal([EventDay.Saturday], discrepancy.AffectedDays);
+    }
+}
+
+public class TextMismatchRuleTests
+{
+    private static GuestRecord With(string name, string? title = null, string? postNominal = null, string? position = null)
+    {
+        var record = Guest(name);
+        record.Title = title;
+        record.PostNominal = postNominal;
+        record.Position = position;
+        return record;
+    }
+
+    [Theory]
+    [InlineData("Dr", "Ms", true)]
+    [InlineData("Mr.", "Mr", false)]   // full stops and case don't count
+    [InlineData("MR", "mr", false)]
+    [InlineData("Dr", null, true)]     // missing in the master list
+    [InlineData(null, "Ms", false)]    // blank in the export: leave it
+    [InlineData("nil", "Ms", false)]
+    public void Title(string? source, string? processed, bool differs)
+    {
+        var discrepancy = new TitleMismatchRule().Evaluate(Pair(With("A", title: source), With("A", title: processed)));
+
+        Assert.Equal(differs, discrepancy is not null);
+        if (discrepancy is not null)
+        {
+            Assert.Equal(DiscrepancyType.TitleMismatch, discrepancy.Type);
+            Assert.Equal(source, discrepancy.SourceValue);
+            Assert.Equal(processed, discrepancy.ProcessedValue);
+        }
+    }
+
+    [Theory]
+    [InlineData("OAM", "AM", true)]
+    [InlineData("O.A.M.", "OAM", false)]
+    [InlineData(null, "AM", false)]
+    public void Post_nominal(string? source, string? processed, bool differs) =>
+        Assert.Equal(differs, new PostNominalMismatchRule().Evaluate(Pair(With("A", postNominal: source), With("A", postNominal: processed))) is not null);
+
+    [Theory]
+    [InlineData("Managing Director", "Director", true)]
+    [InlineData("Managing  director", "Managing Director", false)]
+    [InlineData("nil", "Director", false)]                        // nil in the export: don't change it
+    [InlineData(null, "Director", false)]
+    [InlineData("Teacher", "Guest of Mr Marco Bellini", false)]   // a host link, not a job title
+    [InlineData("Teacher", null, true)]
+    public void Position(string? source, string? processed, bool differs) =>
+        Assert.Equal(differs, new PositionMismatchRule().Evaluate(Pair(With("A", position: source), With("A", position: processed))) is not null);
+
+    [Fact]
+    public void Detail_names_both_values()
+    {
+        var discrepancy = new PositionMismatchRule().Evaluate(Pair(With("A", position: "Managing Director"), With("A", position: "Director")));
+
+        Assert.Equal("Source has “Managing Director”, Processed has “Director”", discrepancy?.Detail);
     }
 }
 

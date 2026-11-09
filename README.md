@@ -3,14 +3,15 @@
 Compares the ticketing system's **RSVP export** (Source) with the hand-maintained **master guest list**
 (Processed) and lists the differences in:
 
-- which days each person and their guests are attending (Thu, Fri, Sat, Sun, Grid Gala)
-- mobile numbers
-- email addresses
+- which days each person and their guests are invited to and attending (Thu, Fri, Sat, Sun, Grid Gala)
+- mobile numbers and email addresses
+- title, post nominal and position title
 
 It comes in two forms that share the same comparison code:
 
 - **Console app (`GalaReconciler.exe`)**: put it in a folder with the two files and run it. It works out
-  which file is which and saves the differences as an Excel report next to them.
+  which file is which and saves two new files next to them: a results workbook and a highlighted copy of
+  the master list. The original files are never changed.
 - **Web app**: upload the two files in a browser. Each comparison runs in the background, is saved as a
   run in a local SQLite database (results only), and the run page updates over SignalR. The Runs page lists
   past runs with filters.
@@ -34,16 +35,44 @@ Download `GalaReconciler-win-x64` from the latest run of the **Console app** wor
 
 1. Put `GalaReconciler.exe` in the folder with the RSVP export and the master guest list (any file names).
 2. Double-click it.
-3. The report is saved in the same folder as `GALA Reconciliation <date> <time>.xlsx`, and the window
-   waits for a key press so the summary can be read.
+3. Two files are saved in the same folder, and the window waits for a key press so the summary can be read:
+   - `GALA Reconciliation <date> <time>.xlsx`: the results
+   - `GALA Reconciliation <date> <time> - <master list name> (highlighted).xlsx`: the highlighted copy
 
-The report has three sheets:
+   Re-running never overwrites earlier files; both get the next "(2)", "(3)"… number together.
+
+The **highlighted copy** is the master list exactly as it was (other sheets, hidden columns and formatting
+kept) with every difference marked on its own row:
+
+| Mark | Meaning |
+|---|---|
+| Yellow cell with a note | The value differs from the RSVP export. The note gives both values (or, for a day, both answers). Marked cells: the day columns, Prenom, Postnom, Position, Phone, Email 1/Email 2. |
+| Red First Name and Surname | The person isn't in the RSVP export. The note gives a possible match if there's a similar name. |
+
+People only in the RSVP export have no row to mark; they're listed in the results as "Guest not found".
+
+The **results workbook** has three sheets:
 
 | Sheet | Contents |
 |---|---|
-| Summary | File names, guest counts and the number of each type of difference. |
+| Summary | File names (including the highlighted copy), guest counts and the number of each type of difference. |
 | Differences | One row per difference in a filterable Excel table: type, guest, host, details, both values, a day grid (Source → Processed, differing days highlighted) and the sheet/row location in each file. |
-| Warnings | Unrecognised ticket types, duplicate rows and other oddities found while reading. |
+| Warnings | Unrecognised ticket types or day values, duplicate rows and other oddities found while reading. |
+
+### What is compared
+
+| | RSVP export (Source) | Master list (Processed) | Flagged when |
+|---|---|---|---|
+| Days | a ticket "… attending" / "… not attending" per day, or no ticket | `Y` invited and coming, `N` invited and not coming, `1` invited with no response yet, blank (or anything else) not invited | "attending" isn't `Y`; "not attending" isn't `N`; no ticket but `Y` (or `N` with `--strict`). No ticket matches blank or `1`. |
+| Title | "Please specify your title", else Title | Prenom | different |
+| Post nominal | "Please specify your post nominal", else Post nominal | Postnom | different |
+| Position | Position title | Position (rows saying "Guest of …" are skipped) | different |
+| Mobile | Mobile + Telephone (all of a person's rows) | Phone | any number only on one side |
+| Email | Email | Email 1 + Email 2 | any address only on one side |
+
+For title, post nominal and position, a blank or `nil` value in the export never raises anything (the
+master list is left as it is), and case, full stops and spacing are ignored (`Mr.` = `Mr`, `O.A.M.` = `OAM`).
+A drop-down value of "Other" with nothing specified counts as blank.
 
 How the files are found: every `.xlsx` in the folder is opened (except Excel's `~$` lock files and earlier
 `GALA Reconciliation…` reports). The one with `Ticket type` and `Order id` columns is the RSVP export, and the
@@ -122,7 +151,7 @@ npm run watch:css
 | Setting | Meaning |
 |---|---|
 | `ConnectionStrings:Reconciliation` | SQLite database for saved runs. A relative path is relative to the web project folder. |
-| `StrictNotAttending` | By default "not attending" and "no response" count as the same thing. `true` also flags days where one file says N and the other is blank. (The console app's `--strict` flag does the same.) |
+| `StrictNotAttending` | By default a day with no ticket in the RSVP export is fine against `N` in the master list (the guest may have declined outside the ticketing system). `true` flags it. (The console app's `--strict` flag does the same.) |
 | `RetentionDays` | Runs older than this are deleted automatically (checked at startup and every 6 hours). `0` keeps them forever. |
 | `MaxQueuedComparisons` | How many uploads can wait for the worker. Each holds both files in memory (up to ~20 MB), and further uploads get a "server is busy" message. |
 
@@ -181,12 +210,14 @@ src/GalaReconciler.Core/           the comparison, shared by both apps
   Parsing/                         SourceRsvpParser, ProcessedGuestListParser, HeaderMap, TicketTypeParser, WorkbookDetector
   Normalization/                   NameNormalizer, PhoneNormalizer, EmailNormalizer
   Matching/                        GuestMatcher (name, then unique shared email; never phone)
-  Rules/                           IDiscrepancyRule + DatesMismatch, MobileNumberMismatch, EmailMismatch
+  Rules/                           IDiscrepancyRule + DatesMismatch, MobileNumberMismatch, EmailMismatch,
+                                   and TextMismatchRule (Title, PostNominal, Position)
 
 src/GalaReconciler.Cli/            console app → GalaReconciler.exe
   CliApp.cs                        find files → compare → save report
   InputFileFinder.cs               picks the two workbooks out of a folder
-  ExcelReportWriter.cs             Summary / Differences / Warnings workbook
+  ExcelReportWriter.cs             results workbook: Summary / Differences / Warnings
+  ProcessedFileHighlighter.cs      highlighted copy of the master list (yellow cells with notes, red names)
   Properties/PublishProfiles/win-x64.pubxml   single-file publish settings
 
 src/GalaReconciler.Web/            web app
@@ -209,7 +240,8 @@ expander, so they have to sit above both `Features/` and `Shared/`.
 ## Adding a new rule
 
 1. Create a class in `src/GalaReconciler.Core/Rules/` that implements `IDiscrepancyRule`. For a
-   set-of-values comparison like phones or emails, derive from `SetMismatchRule` instead.
+   set-of-values comparison like phones or emails, derive from `SetMismatchRule`; for a single text field
+   like title, derive from `TextMismatchRule`.
 2. Add a value to `DiscrepancyType` (and its label in `DiscrepancyTypeExtensions.ToDisplay`).
 3. Register it in `ComparisonServiceCollectionExtensions.AddComparison` (both apps pick it up):
    ```csharp
@@ -217,7 +249,8 @@ expander, so they have to sit above both `Features/` and `Shared/`.
    ```
    Rules run in registration order.
 4. Give the new type colours in the web views (`Results.cshtml`: `BadgeClasses`, `DotClasses`,
-   `CardDescription`; `Runs.cshtml`: `CountClasses`) and in `ExcelReportWriter.StyleType`.
+   `CardDescription`; `Runs.cshtml`: `CountClasses`) and in `ExcelReportWriter.StyleType`. Say which
+   master-list column to mark in `ProcessedFileHighlighter.Marks`.
 5. Saved web runs keep a count per type for the runs list: add a `…Count` column to `Run` (set it in
    `RunStore.CompleteAsync`, and add it to `Run.CountOf` and the `Type` filter in `RunStore.ListAsync`),
    then add a migration.

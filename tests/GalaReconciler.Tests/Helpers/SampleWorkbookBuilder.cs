@@ -23,15 +23,15 @@ public static class SampleWorkbookBuilder
             Leilani("Saturday attending", "0491570158"),
             Marco("Sunday attending", "049157156"),
             Leilani("Sunday attending", "0491570157"),
-            // Row 10: identical in both files.
+            // Row 10: identical in both files ("Ms." and "Ms" count as the same title).
             new SourceTicket("Saturday attending", "Alice", "Romano", "K3LMP9QA")
             {
-                Title = "Ms", Mobile = "0491570159", Email = "alice.romano@example.com",
+                Title = "Ms.", Mobile = "0491570159", Email = "alice.romano@example.com",
             },
-            // Row 11: "Grant Taylor" vs "Grant-Taylor"; different email.
+            // Row 11: "Grant Taylor" vs "Grant-Taylor"; different email; post nominal from "Please specify" (OAM) vs AM.
             new SourceTicket("Saturday attending", "Olivia", "Grant Taylor", "Q8WTR2ZN")
             {
-                Title = "Ms", Mobile = "0491570110", Email = "olivia.grant@example.com",
+                Title = "Ms", PostNominal = "Other", PostNominalOther = "OAM", Mobile = "0491570110", Email = "olivia.grant@example.com",
             },
             // Row 12: bought by an assistant; buyer contact details must not be used.
             new SourceTicket("Saturday not attending", "Ethan", "Cole", "MH4421XP")
@@ -73,15 +73,15 @@ public static class SampleWorkbookBuilder
             })
         .AddSourceSheet(
             GalaSheet,
-            // Mobile and landline in separate columns; Processed has both in one multi-line cell.
+            // Mobile and landline in separate columns; Processed has both in one multi-line cell. Position "nil" is ignored.
             new SourceTicket("Grid Gala attending", "Oscar", "Reid", "GG10JW01")
             {
-                Title = "Mr", Mobile = "0491570737", Telephone = "(08) 7010 0175", Email = "oscar.reid@example.com",
+                Title = "Mr", Mobile = "0491570737", Telephone = "(08) 7010 0175", Email = "oscar.reid@example.com", PositionTitle = "nil",
             },
-            // Three people sharing one phone number; Clara and Felix are Henry's guests.
+            // Three people sharing one phone number; Clara and Felix are Henry's guests. Henry's position title differs.
             new SourceTicket("Grid Gala attending", "Henry", "Walsh", "GG20TS02")
             {
-                Title = "Mr", Telephone = "0491 571 266", Email = "henry.walsh@example.com",
+                Title = "Mr", Telephone = "0491 571 266", Email = "henry.walsh@example.com", PositionTitle = "Managing Director",
             },
             new SourceTicket("Grid Gala attending", "Clara", "Walsh", "GG20TS02")
             {
@@ -110,12 +110,12 @@ public static class SampleWorkbookBuilder
             {
                 Prenom = "Ms", Sat = "Y", Phone = "0491 570 159", Email1 = "alice.romano@example.com", Dietary = "Vegetarian",
             },
-            new ProcessedGuest("Olivia", "Grant-Taylor") // row 5: phone is a numeric cell
+            new ProcessedGuest("Olivia", "Grant-Taylor") // row 5: phone is a numeric cell; post nominal AM vs OAM in the export
             {
-                Prenom = "Ms", Sat = "Y", Organisation = "Harbour City FC", Phone = 491570110, Email1 = "ogrant@example.org",
+                Prenom = "Ms", Postnom = "AM", Sat = "Y", Organisation = "Harbour City FC", Phone = 491570110, Email1 = "ogrant@example.org",
             },
             null, // row 6: blank
-            new ProcessedGuest("Ethan", "Cole") // row 7
+            new ProcessedGuest("Ethan", "Cole") // row 7: Grid Gala 1 = invited, no response; he has no Gala ticket, so that matches
             {
                 Prenom = "Mr", Sat = "N", GridGala = 1, Organisation = "Northwind Capital", Email1 = "ethan.cole@example.net",
             },
@@ -123,24 +123,24 @@ public static class SampleWorkbookBuilder
             {
                 Prenom = "Mr", Sun = "N", GuestName = "guest", Phone = "0491574118", Email1 = "luca.dimarco@example.com",
             },
-            new ProcessedGuest("Oscar", "Reid") // row 9: curly apostrophe in Guest Name
+            new ProcessedGuest("Oscar", "Reid") // row 9: curly apostrophe in Guest Name; position kept (export says "nil")
             {
-                Prenom = "Mr", GridGala = "Y", GuestName = "Ms Maeve O’Connell", Phone = "- 0491570737\n08 7010 0175",
-                Email1 = "oscar.reid@example.com",
+                Prenom = "Mr", GridGala = "Y", GuestName = "Ms Maeve O’Connell", Position = "Chief Executive",
+                Phone = "- 0491570737\n08 7010 0175", Email1 = "oscar.reid@example.com",
             },
             new ProcessedGuest("Maeve", "O'Connell") // row 10: doubled title in Position; not in Source
             {
                 Prenom = "Ms", GridGala = "Y", Position = "Guest of Mr Mr Oscar Reid", Email1 = "maeve.oconnell@example.org",
                 Accessibility = "Wheelchair access",
             },
-            new ProcessedGuest("Henry", "Walsh") // row 11: multi-line Guest Name
+            new ProcessedGuest("Henry", "Walsh") // row 11: multi-line Guest Name; position "Director" vs "Managing Director"
             {
-                Prenom = "Mr", GridGala = "Y", GuestName = "Mrs Clara Walsh\nMr Felix Moreau", Phone = "0491 571 266",
+                Prenom = "Mr", GridGala = "Y", GuestName = "Mrs Clara Walsh\nMr Felix Moreau", Position = "Director", Phone = "0491 571 266",
                 Email1 = "henry.walsh@example.com",
             },
-            new ProcessedGuest("Clara", "Walsh") // row 12
+            new ProcessedGuest("Clara", "Walsh") // row 12: Grid Gala 1 (no response yet), but she is attending in the export
             {
-                Prenom = "Mrs", GridGala = "Y", Position = "Guest of Mr Henry Walsh", Phone = "0491 571 266",
+                Prenom = "Mrs", GridGala = 1, Position = "Guest of Mr Henry Walsh", Phone = "0491 571 266",
             },
             new ProcessedGuest("Felix", "Moreau") // row 13: "nil" email placeholder
             {
@@ -166,13 +166,14 @@ public static class SampleWorkbookBuilder
     private static SourceTicket Marco(string ticketType, object telephone) =>
         new(ticketType, "Marco", "Bellini", "Q7RT2MXA")
         {
-            Title = "Mr", Telephone = telephone, Email = "marco.bellini@example.com",
+            Title = "Mr", PositionTitle = "Managing Director", Telephone = telephone, Email = "marco.bellini@example.com",
         };
 
     private static SourceTicket Leilani(string ticketType, object telephone) =>
         new(ticketType, "Leilani", "Fonua", "Q7RT2MXA")
         {
-            Title = "Ms", Telephone = telephone, Email = "leilani.fonua@example.com",
+            // "Please specify your title" (Dr) wins over Title. Her position title isn't compared: her row says "Guest of".
+            Title = "Other", TitleOther = "Dr", PositionTitle = "Teacher", Telephone = telephone, Email = "leilani.fonua@example.com",
             BuyerFirstName = "Marco", BuyerLastName = "Bellini",
         };
 }

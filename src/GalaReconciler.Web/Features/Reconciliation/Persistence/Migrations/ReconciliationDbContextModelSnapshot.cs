@@ -58,6 +58,12 @@ namespace GalaReconciler.Web.Features.Reconciliation.Persistence.Migrations
                     b.Property<int>("MobileNumberMismatchCount")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("PositionMismatchCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PostNominalMismatchCount")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ProcessedFileName")
                         .IsRequired()
                         .HasMaxLength(260)
@@ -84,6 +90,9 @@ namespace GalaReconciler.Web.Features.Reconciliation.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("TitleMismatchCount")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("WarningCount")
                         .HasColumnType("INTEGER");

@@ -1,8 +1,12 @@
 GALA Reconciler
 ===============
 
-Compares the RSVP export from the ticketing system with the master guest list and saves the
-differences (attendance days, mobile numbers and emails) to an Excel file.
+Compares the RSVP export from the ticketing system with the master guest list. It saves two new files:
+
+  - a results workbook listing every difference, and
+  - a highlighted copy of the master list, with the cells that need attention marked.
+
+Your two original files are only read. They are never changed.
 
 
 How to use
@@ -15,30 +19,58 @@ How to use
 
 2. Double-click GalaReconciler.exe.
 
-3. A window shows which files were used and how many differences were found. The report is saved
-   in the same folder as:
-     GALA Reconciliation <date> <time>.xlsx
+3. A window shows which files were used and how many differences were found. Two files are saved in
+   the same folder:
+     GALA Reconciliation <date> <time>.xlsx                                 (the results)
+     GALA Reconciliation <date> <time> - <master list name> (highlighted).xlsx (the highlighted copy)
+   Running it again never overwrites earlier files: new ones get "(2)", "(3)" and so on.
 
 4. Press any key to close the window.
 
-Nothing is sent anywhere: the files are read on this computer and only the report is written.
+Nothing is sent anywhere: the files are read on this computer and only the two new files are written.
 
 
-The report
-----------
+The highlighted copy of the master list
+---------------------------------------
+
+It is your master list exactly as it was, with:
+  Yellow cells   A value that differs from the RSVP export. Hover over the cell (or look for the red
+                 corner) to see a note with the RSVP export's value and this list's value.
+  Red names      First Name and Surname of people who are not in the RSVP export at all.
+
+People who are only in the RSVP export can't be highlighted here (they have no row); they are listed in
+the results workbook as "Guest not found".
+
+
+What is compared
+----------------
+
+Days       Each day column in the master list means:
+             Y       invited and coming
+             N       invited and not coming
+             1       invited, no response yet
+             blank   not invited (anything else is also treated as not invited, and listed as a warning)
+           A day is highlighted when the RSVP export disagrees: "attending" must be Y, "not attending" must
+           be N. With no ticket for that day, blank or 1 are both fine.
+Title      "Please specify your title" wins over Title. Compared with Prenom.
+Post nominal  "Please specify your post nominal" wins over Post nominal. Compared with Postnom.
+Position   Position title, compared with Position. Rows whose Position says "Guest of ..." are skipped.
+Phone      All numbers for the person, ignoring spaces and +61.
+Email      Email 1 and Email 2.
+
+For title, post nominal and position: if the RSVP export is blank or says "nil", the master list is
+left alone. Capitals, full stops and spacing don't count ("Mr." is the same as "Mr").
+
+
+The results workbook
+--------------------
 
 Summary      File names, guest counts and the number of each type of difference.
 Differences  One row per difference. Use the filter arrows in the header row to show one type.
-             Day columns show Source → Processed: ✓ attending, ✗ not attending, – no response.
-             Highlighted days are the ones that differ.
+             Day columns show Source → Processed: ✓ attending, ✗ not attending, ? invited with no
+             response yet, – no RSVP / not invited. Highlighted days are the ones that differ.
              Location gives the sheet and row numbers so you can find each person in the files.
 Warnings     Things that looked odd in the files, such as an unrecognised ticket type.
-
-Types of difference:
-  Guest not found   The person is only in one of the files.
-  Dates mismatch    Attending on a day in one file but not the other.
-  Mobile mismatch   The phone numbers differ.
-  Email mismatch    The email addresses differ.
 
 
 If something goes wrong
@@ -50,8 +82,8 @@ If something goes wrong
 "Found more than one ..."
     Move the files you don't want to compare out of the folder.
 
-"Couldn't save the report"
-    A report with that name is open in Excel. Close it and run the app again.
+"Couldn't save the output files"
+    A file with the same name is open in Excel. Close it and run the app again.
 
 Windows may show a "Windows protected your PC" message the first time. Click "More info", then
 "Run anyway".
@@ -63,6 +95,8 @@ Running from a command prompt (optional)
   GalaReconciler                                   search the current folder
   GalaReconciler source.xlsx processed.xlsx        use these two files
   GalaReconciler --folder "C:\Gala\November"       search another folder
-  GalaReconciler --output "C:\Reports\gala.xlsx"   choose where to save the report
-  GalaReconciler --strict                          treat "not attending" and "no response" as different
+  GalaReconciler --output "C:\Reports\gala.xlsx"   choose where to save the results (the highlighted copy
+                                                   goes next to it)
+  GalaReconciler --strict                          also flag days where the master list says N but the
+                                                   RSVP export has no ticket
   GalaReconciler --help                            show all options

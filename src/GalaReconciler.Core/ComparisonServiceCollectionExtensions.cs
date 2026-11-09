@@ -22,6 +22,9 @@ public static class ComparisonServiceCollectionExtensions
         services.AddSingleton<IDiscrepancyRule, DatesMismatchRule>();
         services.AddSingleton<IDiscrepancyRule, MobileNumberMismatchRule>();
         services.AddSingleton<IDiscrepancyRule, EmailMismatchRule>();
+        services.AddSingleton<IDiscrepancyRule, TitleMismatchRule>();
+        services.AddSingleton<IDiscrepancyRule, PostNominalMismatchRule>();
+        services.AddSingleton<IDiscrepancyRule, PositionMismatchRule>();
 
         services.AddScoped<CompareFilesHandler>();
         return services;

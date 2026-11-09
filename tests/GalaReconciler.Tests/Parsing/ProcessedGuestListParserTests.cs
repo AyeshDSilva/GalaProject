@@ -18,12 +18,11 @@ public class ProcessedGuestListParserTests
     [Theory]
     [InlineData("Y", AttendanceState.Attending)]
     [InlineData(" y ", AttendanceState.Attending)]
-    [InlineData("1", AttendanceState.Attending)]
-    [InlineData("2", AttendanceState.Attending)]
+    [InlineData("1", AttendanceState.AwaitingResponse)]
     [InlineData("N", AttendanceState.NotAttending)]
     [InlineData("n", AttendanceState.NotAttending)]
-    [InlineData("", AttendanceState.NoResponse)]
-    [InlineData(null, AttendanceState.NoResponse)]
+    [InlineData("", AttendanceState.NotInvited)]
+    [InlineData(null, AttendanceState.NotInvited)]
     public void Parses_day_cells(string? value, AttendanceState expected)
     {
         Assert.True(ProcessedGuestListParser.TryParseDayCell(value, out var state));
@@ -42,9 +41,9 @@ public class ProcessedGuestListParserTests
         Assert.Equal("Alice Romano", alice.DisplayName);
         Assert.Equal("Ms", alice.Title);
         Assert.Equal(AttendanceState.NotAttending, alice.GetAttendance(EventDay.Thursday));
-        Assert.Equal(AttendanceState.NoResponse, alice.GetAttendance(EventDay.Friday));
+        Assert.Equal(AttendanceState.NotInvited, alice.GetAttendance(EventDay.Friday));
         Assert.Equal(AttendanceState.Attending, alice.GetAttendance(EventDay.Saturday));
-        Assert.Equal(AttendanceState.Attending, alice.GetAttendance(EventDay.GridGala));
+        Assert.Equal(AttendanceState.AwaitingResponse, alice.GetAttendance(EventDay.GridGala));
         Assert.Equal(["0491570159"], alice.Phones);
         Assert.Equal(["alice.romano@example.com"], alice.Emails);
         Assert.Equal(new RowReference("Sheet1", 2), Assert.Single(alice.Rows));
@@ -136,12 +135,40 @@ public class ProcessedGuestListParserTests
         Assert.Contains(result.Warnings, w => w.Message.Contains("more than once"));
     }
 
+    [Theory]
+    [InlineData("2")]
+    [InlineData("maybe")]
+    [InlineData("x")]
+    public void Anything_else_in_a_day_cell_means_not_invited_and_is_flagged(string value)
+    {
+        Assert.False(ProcessedGuestListParser.TryParseDayCell(value, out var state));
+        Assert.Equal(AttendanceState.NotInvited, state);
+    }
+
+    [Fact]
+    public void Reads_title_post_nominal_and_position()
+    {
+        var result = Parse(
+            new ProcessedGuest("Henry", "Walsh") { Prenom = "Dr", Postnom = "AM", Position = "Director" },
+            new ProcessedGuest("Clara", "Walsh") { Prenom = "nil", Position = "Guest of Dr Henry Walsh" });
+
+        var henry = Single(result, "Henry Walsh");
+        Assert.Equal("Dr", henry.Title);
+        Assert.Equal("AM", henry.PostNominal);
+        Assert.Equal("Director", henry.Position);
+
+        var clara = Single(result, "Clara Walsh");
+        Assert.Null(clara.Title);
+        Assert.True(ProcessedGuestListParser.IsHostLink(clara.Position));
+        Assert.False(ProcessedGuestListParser.IsHostLink(henry.Position));
+    }
+
     [Fact]
     public void Unrecognised_day_value_produces_a_warning()
     {
         var result = Parse(new ProcessedGuest("Alice", "Romano") { Sat = "maybe" });
 
-        Assert.Equal(AttendanceState.NoResponse, Assert.Single(result.Records).GetAttendance(EventDay.Saturday));
+        Assert.Equal(AttendanceState.NotInvited, Assert.Single(result.Records).GetAttendance(EventDay.Saturday));
         Assert.Contains(result.Warnings, w => w.Message.Contains("maybe"));
     }
 

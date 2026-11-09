@@ -15,6 +15,8 @@ public sealed record ProcessedGuest(string FirstName, string Surname)
 
     public object? GridGala { get; init; }
 
+    public string? Postnom { get; init; }
+
     public string? GuestName { get; init; }
 
     public string? Position { get; init; }
@@ -65,7 +67,7 @@ public static class ProcessedSheet
         object?[] row =
         [
             "•", "T1", guest.Thurs, guest.Fri, guest.Sat, guest.Sun, guest.GridGala, guest.Prenom, guest.FirstName,
-            guest.Surname, null, guest.GuestName, guest.Position, guest.Organisation, guest.Phone, guest.Email1,
+            guest.Surname, guest.Postnom, guest.GuestName, guest.Position, guest.Organisation, guest.Phone, guest.Email1,
             guest.Email2, guest.Dietary, guest.Accessibility, guest.Comments, "VIP",
         ];
         return row;

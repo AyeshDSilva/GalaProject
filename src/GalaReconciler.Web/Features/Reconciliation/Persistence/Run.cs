@@ -51,6 +51,12 @@ public sealed class Run
 
     public int EmailMismatchCount { get; set; }
 
+    public int TitleMismatchCount { get; set; }
+
+    public int PostNominalMismatchCount { get; set; }
+
+    public int PositionMismatchCount { get; set; }
+
     public int WarningCount { get; set; }
 
     public string? ErrorTitle { get; set; }
@@ -63,14 +69,18 @@ public sealed class Run
 
     public List<RunWarning> Warnings { get; set; } = [];
 
-    public int DiscrepancyCount => GuestNotFoundCount + DatesMismatchCount + MobileNumberMismatchCount + EmailMismatchCount;
+    public int DiscrepancyCount => Enum.GetValues<DiscrepancyType>().Sum(CountOf);
 
     public int CountOf(DiscrepancyType type) => type switch
     {
         DiscrepancyType.GuestNotFound => GuestNotFoundCount,
         DiscrepancyType.DatesMismatch => DatesMismatchCount,
         DiscrepancyType.MobileNumberMismatch => MobileNumberMismatchCount,
-        _ => EmailMismatchCount,
+        DiscrepancyType.EmailMismatch => EmailMismatchCount,
+        DiscrepancyType.TitleMismatch => TitleMismatchCount,
+        DiscrepancyType.PostNominalMismatch => PostNominalMismatchCount,
+        DiscrepancyType.PositionMismatch => PositionMismatchCount,
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Add a count column for this type."),
     };
 }
 

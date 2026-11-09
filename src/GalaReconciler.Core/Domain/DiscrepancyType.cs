@@ -6,6 +6,9 @@ public enum DiscrepancyType
     DatesMismatch,
     MobileNumberMismatch,
     EmailMismatch,
+    TitleMismatch,
+    PostNominalMismatch,
+    PositionMismatch,
 }
 
 public static class DiscrepancyTypeExtensions
@@ -16,6 +19,9 @@ public static class DiscrepancyTypeExtensions
         DiscrepancyType.DatesMismatch => "Dates mismatch",
         DiscrepancyType.MobileNumberMismatch => "Mobile mismatch",
         DiscrepancyType.EmailMismatch => "Email mismatch",
+        DiscrepancyType.TitleMismatch => "Title mismatch",
+        DiscrepancyType.PostNominalMismatch => "Post nominal mismatch",
+        DiscrepancyType.PositionMismatch => "Position mismatch",
         _ => type.ToString(),
     };
 }

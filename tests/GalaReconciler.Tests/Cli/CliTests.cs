@@ -153,7 +153,8 @@ public sealed class ExcelReportWriterTests : IDisposable
         Assert.Equal("Source.xlsx", ValueFor("Source file"));
         Assert.Equal("12", ValueFor("Matched"));
         Assert.Equal("4", ValueFor("Guest not found"));
-        Assert.Equal("10", ValueFor("Total"));
+        Assert.Equal("13", ValueFor("Total"));
+        Assert.Equal("1", ValueFor("Position mismatch"));
         Assert.Equal("1", ValueFor("Warnings"));
     }
 
@@ -165,7 +166,7 @@ public sealed class ExcelReportWriterTests : IDisposable
 
         var table = sheet.Tables.Single();
         Assert.True(table.ShowAutoFilter);
-        Assert.Equal(10, table.DataRange.RowCount());
+        Assert.Equal(13, table.DataRange.RowCount());
         Assert.Equal(
             ["Type", "Guest", "Name in Source", "Guest of", "Details", "Possible match", "Matched by", "Source", "Processed",
              "Thu", "Fri", "Sat", "Sun", "Gala", "Source location", "Processed location"],
@@ -181,12 +182,15 @@ public sealed class ExcelReportWriterTests : IDisposable
         Assert.Equal("Sheet1 · row 2", marco.Field("Processed location").GetString());
         Assert.Equal("", marco.Field("Gala").GetString());
 
-        // Ethan isn't on the Grid Gala sheet but is attending in the master list: Gala differs and is highlighted.
-        var ethan = Row("Ethan Cole", "Dates mismatch");
-        Assert.Equal("– → ✓", ethan.Field("Gala").GetString());
-        Assert.Equal(XLColor.FromHtml("#FDE68A"), ethan.Field("Gala").Style.Fill.BackgroundColor);
-        Assert.Equal("✗ → ✗", ethan.Field("Sat").GetString());
-        Assert.NotEqual(XLColor.FromHtml("#FDE68A"), ethan.Field("Sat").Style.Fill.BackgroundColor);
+        // Clara is attending but still marked 1 (invited, no response) for the Gala: that day differs and is highlighted.
+        var clara = Row("Clara Walsh", "Dates mismatch");
+        Assert.Equal("✓ → ?", clara.Field("Gala").GetString());
+        Assert.Equal(XLColor.FromHtml("#FDE68A"), clara.Field("Gala").Style.Fill.BackgroundColor);
+        Assert.Equal("– → –", clara.Field("Sat").GetString());
+        Assert.NotEqual(XLColor.FromHtml("#FDE68A"), clara.Field("Sat").Style.Fill.BackgroundColor);
+
+        Assert.Equal("Dr", Row("Leilani Fonua", "Title mismatch").Field("Source").GetString());
+        Assert.Equal("Director", Row("Henry Walsh", "Position mismatch").Field("Processed").GetString());
 
         Assert.Equal("Email", Row("William Hartley", "Dates mismatch").Field("Matched by").GetString());
         Assert.Equal("Bill Hartley", Row("William Hartley", "Dates mismatch").Field("Name in Source").GetString());
@@ -216,33 +220,45 @@ public sealed class CliAppTests : IDisposable
         new CliApp(TestHandlers.CreateCompareFilesHandler(), _output).Run(CliOptions.Parse(args), _folder.Path);
 
     private string[] Reports() =>
-        Directory.GetFiles(_folder.Path, $"{InputFileFinder.ReportFilePrefix}*.xlsx").Select(Path.GetFileName).ToArray()!;
+        Directory.GetFiles(_folder.Path, $"{InputFileFinder.ReportFilePrefix}*.xlsx").Select(Path.GetFileName).Order().ToArray()!;
 
     [Fact]
-    public void Writes_a_report_next_to_the_files()
+    public void Writes_results_and_a_highlighted_copy_and_leaves_the_originals_alone()
     {
         _folder.AddSamples();
+        var sourceBefore = File.ReadAllBytes(_folder.File("RSVP export.xlsx"));
+        var processedBefore = File.ReadAllBytes(_folder.File("Master list.xlsx"));
 
         Assert.Equal(ExitCodes.Success, Run());
 
-        var report = Assert.Single(Reports());
-        Assert.Matches(@"^GALA Reconciliation \d{4}-\d{2}-\d{2} \d{4}\.xlsx$", report);
+        var reports = Reports();
+        Assert.Equal(2, reports.Length);
+        var results = Assert.Single(reports, r => !r.Contains("(highlighted)"));
+        Assert.Matches(@"^GALA Reconciliation \d{4}-\d{2}-\d{2} \d{4}\.xlsx$", results);
+        Assert.Contains($"{Path.GetFileNameWithoutExtension(results)} - Master list (highlighted).xlsx", reports);
+        Assert.Equal(sourceBefore, File.ReadAllBytes(_folder.File("RSVP export.xlsx")));
+        Assert.Equal(processedBefore, File.ReadAllBytes(_folder.File("Master list.xlsx")));
+
         var text = _output.ToString();
         Assert.Contains("Source file:    RSVP export.xlsx", text);
         Assert.Contains("Processed file: Master list.xlsx", text);
-        Assert.Contains("10 differences: 4 guest not found, 2 dates mismatch, 2 mobile mismatch, 2 email mismatch", text);
-        Assert.Contains("Report saved:", text);
+        Assert.Contains(
+            "13 differences: 4 guest not found, 2 dates mismatch, 2 mobile mismatch, 2 email mismatch, 1 title mismatch, 1 post nominal mismatch, 1 position mismatch",
+            text);
+        Assert.Contains("Results saved:", text);
+        Assert.Contains("Highlighted master list:", text);
+        Assert.Contains("(13 cells highlighted; the original files were not changed)", text);
     }
 
     [Fact]
-    public void Running_again_keeps_the_earlier_report()
+    public void Running_again_keeps_the_earlier_files_and_ignores_them_when_searching()
     {
         _folder.AddSamples();
 
         Assert.Equal(ExitCodes.Success, Run());
         Assert.Equal(ExitCodes.Success, Run());
 
-        Assert.Equal(2, Reports().Length);
+        Assert.Equal(4, Reports().Length);
     }
 
     [Fact]
@@ -254,6 +270,16 @@ public sealed class CliAppTests : IDisposable
 
         Assert.Contains("wrong way round", _output.ToString());
         Assert.True(File.Exists(_folder.File("out.xlsx")));
+        Assert.True(File.Exists(_folder.File("out - Master list (highlighted).xlsx")));
+    }
+
+    [Fact]
+    public void Highlighted_copy_with_a_custom_name_is_not_mistaken_for_a_master_list()
+    {
+        _folder.AddSamples();
+        Assert.Equal(ExitCodes.Success, Run("--output", "mine.xlsx"));
+
+        Assert.Equal(ExitCodes.Success, Run());
     }
 
     [Fact]
@@ -268,15 +294,93 @@ public sealed class CliAppTests : IDisposable
     }
 
     [Fact]
-    public void Report_path_never_overwrites_and_accepts_a_folder()
+    public void Output_paths_never_overwrite_and_accept_a_folder()
     {
         var runAt = new DateTimeOffset(2026, 11, 9, 14, 30, 0, TimeSpan.Zero);
-        var first = CliApp.ReportPath(null, _folder.Path, _folder.Path, runAt);
-        File.WriteAllText(first, "existing");
+        OutputPaths Paths(string? requested, string folder) => OutputPaths.For(requested, _folder.Path, folder, runAt, "Master list.xlsx");
 
-        Assert.Equal(_folder.File("GALA Reconciliation 2026-11-09 1430.xlsx"), first);
-        Assert.Equal(_folder.File("GALA Reconciliation 2026-11-09 1430 (2).xlsx"), CliApp.ReportPath(null, _folder.Path, _folder.Path, runAt));
-        Assert.Equal(_folder.File("mine.xlsx"), CliApp.ReportPath("mine", _folder.Path, _folder.Path, runAt));
-        Assert.Equal(_folder.File("GALA Reconciliation 2026-11-09 1430 (2).xlsx"), CliApp.ReportPath(".", _folder.Path, "C:\\elsewhere", runAt));
+        var first = Paths(null, _folder.Path);
+        Assert.Equal(_folder.File("GALA Reconciliation 2026-11-09 1430.xlsx"), first.Results);
+        Assert.Equal(_folder.File("GALA Reconciliation 2026-11-09 1430 - Master list (highlighted).xlsx"), first.HighlightedCopy);
+
+        // Either file existing moves both on to the next number, so they always pair up.
+        File.WriteAllText(first.HighlightedCopy, "existing");
+        var second = Paths(null, _folder.Path);
+        Assert.Equal(_folder.File("GALA Reconciliation 2026-11-09 1430 (2).xlsx"), second.Results);
+        Assert.Equal(_folder.File("GALA Reconciliation 2026-11-09 1430 (2) - Master list (highlighted).xlsx"), second.HighlightedCopy);
+
+        Assert.Equal(_folder.File("mine.xlsx"), Paths("mine", _folder.Path).Results);
+        Assert.Equal(_folder.File("mine - Master list (highlighted).xlsx"), Paths("mine", _folder.Path).HighlightedCopy);
+        Assert.Equal(second.Results, Paths(".", "C:\\elsewhere").Results);
+    }
+}
+
+public sealed class ProcessedFileHighlighterTests : IDisposable
+{
+    private readonly TempFolder _folder = new();
+
+    public void Dispose() => _folder.Dispose();
+
+    private (XLWorkbook Workbook, int Count) Highlight()
+    {
+        var path = _folder.File("highlighted.xlsx");
+        var count = ProcessedFileHighlighter.Write(SampleWorkbookBuilder.Processed().ToStream().ToArray(), TestHandlers.CompareSamples(), path);
+        return (new XLWorkbook(path), count);
+    }
+
+    /// <summary>The cell in <paramref name="row"/> under the column headed <paramref name="header"/>.</summary>
+    private static IXLCell Cell(IXLWorksheet sheet, int row, string header) =>
+        sheet.Cell(row, sheet.Row(1).CellsUsed().Single(c => c.GetString() == header).Address.ColumnNumber);
+
+    [Fact]
+    public void Marks_every_difference_on_the_right_cell_with_a_note()
+    {
+        var (workbook, count) = Highlight();
+        using var _ = workbook;
+        var sheet = workbook.Worksheet(1);
+        var yellow = ProcessedFileHighlighter.ChangedFill;
+
+        // Rows: 2 Marco, 3 Leilani, 5 Olivia, 7 Ethan, 10 Maeve, 11 Henry, 12 Clara, 14 William, 15 Ruby McIntyre.
+        Assert.Equal(13, count);
+
+        var marcoPhone = Cell(sheet, 2, "Phone");
+        Assert.Equal(yellow, marcoPhone.Style.Fill.BackgroundColor);
+        Assert.Contains("RSVP export: 0491570156, 049157156", marcoPhone.GetComment().Text);
+        Assert.Contains("This list: 0491570156", marcoPhone.GetComment().Text);
+
+        Assert.Equal(yellow, Cell(sheet, 3, "Prenom").Style.Fill.BackgroundColor);
+        Assert.Contains("RSVP export: Dr", Cell(sheet, 3, "Prenom").GetComment().Text);
+        Assert.Equal(yellow, Cell(sheet, 5, "Postnom").Style.Fill.BackgroundColor);
+        Assert.Contains("RSVP export: OAM", Cell(sheet, 5, "Postnom").GetComment().Text);
+        Assert.Equal(yellow, Cell(sheet, 11, "Position").Style.Fill.BackgroundColor);
+        Assert.Equal(yellow, Cell(sheet, 7, "Email 1").Style.Fill.BackgroundColor);
+
+        // Days: only the differing day is marked.
+        Assert.Equal(yellow, Cell(sheet, 14, "SAT").Style.Fill.BackgroundColor);
+        Assert.False(Cell(sheet, 14, "FRI").HasComment);
+        Assert.Contains("RSVP export: Attending\nThis list: Invited, no response", Cell(sheet, 12, "Grid Gala").GetComment().Text.ReplaceLineEndings("\n"));
+
+        // In the master list but not the export: name in red.
+        Assert.Equal(ProcessedFileHighlighter.NotInExportFill, Cell(sheet, 10, "First Name").Style.Fill.BackgroundColor);
+        Assert.Equal(ProcessedFileHighlighter.NotInExportFill, Cell(sheet, 15, "Surname").Style.Fill.BackgroundColor);
+        Assert.Contains("Possible match there: Ruby Macintyre", Cell(sheet, 15, "First Name").GetComment().Text);
+    }
+
+    [Fact]
+    public void Leaves_alone_what_shouldnt_change()
+    {
+        var (workbook, _) = Highlight();
+        using var _workbook = workbook;
+        var sheet = workbook.Worksheet(1);
+
+        Assert.False(Cell(sheet, 9, "Position").HasComment);  // Oscar: export says "nil"
+        Assert.False(Cell(sheet, 3, "Position").HasComment);  // Leilani: "Guest of …" isn't a job title
+        Assert.False(Cell(sheet, 4, "Prenom").HasComment);    // Alice: "Ms." = "Ms"
+        Assert.False(Cell(sheet, 7, "Grid Gala").HasComment); // Ethan: 1 and no ticket agree
+        Assert.False(Cell(sheet, 4, "First Name").HasComment);
+
+        // Everything else in the list is kept, including hidden columns and other data.
+        Assert.True(sheet.Column(2).IsHidden);
+        Assert.Equal("Wheelchair access", Cell(sheet, 10, "Accessibility").GetString());
     }
 }

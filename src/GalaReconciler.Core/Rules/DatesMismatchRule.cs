@@ -5,8 +5,8 @@ using Microsoft.Extensions.Options;
 namespace GalaReconciler.Core.Rules;
 
 /// <summary>
-/// Flags days where one side says Attending and the other doesn't. "Not attending" and "no response"
-/// both mean "not coming" unless <see cref="ComparisonOptions.StrictNotAttending"/> is on.
+/// Flags days where the master list doesn't record what the RSVP export says. A day with no ticket is fine
+/// against "not invited" or "invited, no response"; see <see cref="Differs"/> and <see cref="ComparisonOptions.StrictNotAttending"/>.
 /// </summary>
 public sealed class DatesMismatchRule(IOptions<ComparisonOptions> options) : IDiscrepancyRule
 {
@@ -39,10 +39,22 @@ public sealed class DatesMismatchRule(IOptions<ComparisonOptions> options) : IDi
         };
     }
 
-    private static bool Differs(AttendanceState source, AttendanceState processed, bool strict) =>
-        strict
-            ? source != processed
-            : (source == AttendanceState.Attending) != (processed == AttendanceState.Attending);
+    /// <summary>
+    /// Export "attending" must be Y and "not attending" must be N. No ticket for the day matches a blank
+    /// (not invited) or 1 (invited, no response yet); it differs from Y, and from N only in strict mode
+    /// (someone may have declined outside the ticketing system).
+    /// </summary>
+    private static bool Differs(AttendanceState source, AttendanceState processed, bool strict) => source switch
+    {
+        AttendanceState.Attending => processed != AttendanceState.Attending,
+        AttendanceState.NotAttending => processed != AttendanceState.NotAttending,
+        _ => processed switch
+        {
+            AttendanceState.Attending => true,
+            AttendanceState.NotAttending => strict,
+            _ => false,
+        },
+    };
 
     private static string Describe(IEnumerable<DayComparison> days, Func<DayComparison, AttendanceState> state) =>
         string.Join('\n', days.Select(d => $"{EventDays.Get(d.Day).ShortLabel}: {state(d).ToDisplay()}"));

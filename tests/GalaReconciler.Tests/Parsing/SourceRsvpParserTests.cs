@@ -72,6 +72,36 @@ public class SourceRsvpParserTests
         Assert.All(marco.Rows, r => Assert.Equal("Q7RT2MXA", r.OrderId));
     }
 
+    [Theory]
+    [InlineData("Mr", "Dr", "Dr")]       // "Please specify" wins
+    [InlineData("Mr", "", "Mr")]         // nothing specified: the drop-down
+    [InlineData("Other", "", null)]      // "Other" on its own means nothing was chosen
+    [InlineData("", "nil", null)]
+    [InlineData("Other", "Prof", "Prof")]
+    public void Specified_value_wins_over_the_drop_down(string choice, string specified, string? expected) =>
+        Assert.Equal(expected, SourceRsvpParser.PreferSpecified(choice, specified));
+
+    [Fact]
+    public void Reads_title_post_nominal_and_position_title()
+    {
+        var result = Parse(
+            new SourceTicket("Saturday attending", "Henry", "Walsh")
+            {
+                Title = "Mr", TitleOther = "Dr", PostNominal = "AM", PostNominalOther = "AO", PositionTitle = "Director",
+            },
+            new SourceTicket("Saturday attending", "Clara", "Walsh") { Title = "Mrs", PostNominal = "OAM", PositionTitle = "nil" });
+
+        var henry = Single(result, "Henry Walsh");
+        Assert.Equal("Dr", henry.Title);
+        Assert.Equal("AO", henry.PostNominal);
+        Assert.Equal("Director", henry.Position);
+
+        var clara = Single(result, "Clara Walsh");
+        Assert.Equal("Mrs", clara.Title);
+        Assert.Equal("OAM", clara.PostNominal);
+        Assert.Null(clara.Position);
+    }
+
     [Fact]
     public void Ignores_buyer_contact_details()
     {

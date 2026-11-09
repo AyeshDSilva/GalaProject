@@ -12,7 +12,10 @@
         DiscrepancyType.GuestNotFound => "bg-rose-50 text-rose-700 ring-rose-600/20",
         DiscrepancyType.DatesMismatch => "bg-amber-50 text-amber-800 ring-amber-600/25",
         DiscrepancyType.MobileNumberMismatch => "bg-sky-50 text-sky-700 ring-sky-600/20",
-        _ => "bg-violet-50 text-violet-700 ring-violet-600/20",
+        DiscrepancyType.EmailMismatch => "bg-violet-50 text-violet-700 ring-violet-600/20",
+        DiscrepancyType.TitleMismatch => "bg-teal-50 text-teal-700 ring-teal-600/20",
+        DiscrepancyType.PostNominalMismatch => "bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-600/20",
+        _ => "bg-orange-50 text-orange-700 ring-orange-600/20",
     };
 
     static string DotClasses(DiscrepancyType type) => type switch
@@ -20,7 +23,10 @@
         DiscrepancyType.GuestNotFound => "bg-rose-500",
         DiscrepancyType.DatesMismatch => "bg-amber-500",
         DiscrepancyType.MobileNumberMismatch => "bg-sky-500",
-        _ => "bg-violet-500",
+        DiscrepancyType.EmailMismatch => "bg-violet-500",
+        DiscrepancyType.TitleMismatch => "bg-teal-500",
+        DiscrepancyType.PostNominalMismatch => "bg-fuchsia-500",
+        _ => "bg-orange-500",
     };
 
     static string CardDescription(DiscrepancyType type) => type switch
@@ -28,13 +34,17 @@
         DiscrepancyType.GuestNotFound => "In one file only",
         DiscrepancyType.DatesMismatch => "Attendance differs",
         DiscrepancyType.MobileNumberMismatch => "Phone numbers differ",
-        _ => "Email addresses differ",
+        DiscrepancyType.EmailMismatch => "Email addresses differ",
+        DiscrepancyType.TitleMismatch => "Titles differ",
+        DiscrepancyType.PostNominalMismatch => "Post nominals differ",
+        _ => "Position titles differ",
     };
 
     static (string Symbol, string Classes) DayState(AttendanceState state) => state switch
     {
         AttendanceState.Attending => ("✓", "bg-emerald-50 text-emerald-700"),
         AttendanceState.NotAttending => ("✕", "bg-slate-100 text-slate-500"),
+        AttendanceState.AwaitingResponse => ("?", "bg-sky-50 text-sky-700"),
         _ => ("–", "bg-white text-slate-300 ring-1 ring-inset ring-slate-200"),
     };
 }
@@ -159,7 +169,7 @@
     else
     {
         @* Summary cards (filters) *@
-        <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
             @foreach (var type in ReconciliationResultViewModel.Types)
             {
                 var count = Model.CountOf(type);
@@ -198,7 +208,8 @@
                 <span class="font-medium text-slate-600">Day grid:</span>
                 <span class="inline-flex items-center gap-1"><span class="rounded bg-emerald-50 px-1 font-semibold text-emerald-700">✓</span> Attending</span>
                 <span class="inline-flex items-center gap-1"><span class="rounded bg-slate-100 px-1 font-semibold text-slate-500">✕</span> Not attending</span>
-                <span class="inline-flex items-center gap-1"><span class="rounded bg-white px-1 font-semibold text-slate-300 ring-1 ring-inset ring-slate-200">–</span> No response</span>
+                <span class="inline-flex items-center gap-1"><span class="rounded bg-sky-50 px-1 font-semibold text-sky-700">?</span> Invited, no response</span>
+                <span class="inline-flex items-center gap-1"><span class="rounded bg-white px-1 font-semibold text-slate-300 ring-1 ring-inset ring-slate-200">–</span> No RSVP / not invited</span>
                 <span class="inline-flex items-center gap-1"><span class="size-3.5 rounded ring-2 ring-inset ring-amber-400"></span> Differs</span>
             </div>
 

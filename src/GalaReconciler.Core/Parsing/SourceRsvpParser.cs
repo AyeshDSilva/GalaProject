@@ -29,9 +29,12 @@ public sealed class SourceRsvpParser
         public const string TitleOther = "Please specify your title";
         public const string AttendeeFirstName = "First Name";
         public const string AttendeeLastName = "Last Name";
+        public const string PostNominal = "Post nominal";
+        public const string PostNominalOther = "Please specify your post nominal";
         public const string Mobile = "Mobile";
         public const string Telephone = "Telephone";
         public const string Email = "Email";
+        public const string PositionTitle = "Position title";
     }
 
     private static readonly string[] RequiredHeaders =
@@ -112,9 +115,27 @@ public sealed class SourceRsvpParser
             TitleOther: map.Find(Headers.TitleOther),
             AttendeeFirstName: Find(Headers.AttendeeFirstName, attendeeStart),
             AttendeeLastName: Find(Headers.AttendeeLastName, attendeeStart),
+            PostNominal: map.Find(Headers.PostNominal),
+            PostNominalOther: map.Find(Headers.PostNominalOther),
             Mobile: Find(Headers.Mobile, attendeeStart),
             Telephone: Find(Headers.Telephone, attendeeStart),
-            Email: Find(Headers.Email, attendeeStart));
+            Email: Find(Headers.Email, attendeeStart),
+            PositionTitle: map.Find(Headers.PositionTitle));
+    }
+
+    /// <summary>
+    /// The "Please specify …" answer wins over the drop-down; a drop-down value of "Other" on its own means
+    /// nothing was chosen.
+    /// </summary>
+    public static string? PreferSpecified(string choice, string specified)
+    {
+        var chosen = TextNormalizer.Clean(choice);
+        if (chosen is not null && chosen.Equals("Other", StringComparison.OrdinalIgnoreCase))
+        {
+            chosen = null;
+        }
+
+        return TextNormalizer.Clean(specified) ?? chosen;
     }
 
     private static void ReadSheet(IXLWorksheet sheet, Columns columns, List<Ticket> tickets, List<ReconciliationWarning> warnings)
@@ -162,13 +183,6 @@ public sealed class SourceRsvpParser
                 warnings.Add(new(WarningFile, $"{sheet.Name} row {rowNumber}: unrecognised ticket type {shown} for {displayName}. The row wasn't counted towards any day."));
             }
 
-            var title = Cell(columns.Title);
-            var titleOther = Cell(columns.TitleOther);
-            if ((title.Length == 0 || title.Equals("Other", StringComparison.OrdinalIgnoreCase)) && titleOther.Length > 0)
-            {
-                title = titleOther;
-            }
-
             // Attendee contact details only. Buyer mobile/email are deliberately ignored: the buyer is
             // often someone else (e.g. an assistant buying for an executive).
             var phones = PhoneNormalizer.NormalizeAll(Cell(columns.Mobile))
@@ -186,7 +200,9 @@ public sealed class SourceRsvpParser
                 orderId,
                 displayName,
                 matchKey,
-                title.Length == 0 ? null : title,
+                PreferSpecified(Cell(columns.Title), Cell(columns.TitleOther)),
+                PreferSpecified(Cell(columns.PostNominal), Cell(columns.PostNominalOther)),
+                TextNormalizer.Clean(Cell(columns.PositionTitle)),
                 day,
                 state,
                 phones,
@@ -238,6 +254,8 @@ public sealed class SourceRsvpParser
                 DisplayName = personTickets[0].DisplayName,
                 MatchKey = group.Key,
                 Title = personTickets.Select(t => t.Title).FirstOrDefault(t => t is not null),
+                PostNominal = personTickets.Select(t => t.PostNominal).FirstOrDefault(t => t is not null),
+                Position = personTickets.Select(t => t.Position).FirstOrDefault(t => t is not null),
             };
 
             foreach (var ticket in personTickets)
@@ -337,9 +355,12 @@ public sealed class SourceRsvpParser
         int? TitleOther,
         int AttendeeFirstName,
         int AttendeeLastName,
+        int? PostNominal,
+        int? PostNominalOther,
         int Mobile,
         int Telephone,
-        int Email);
+        int Email,
+        int? PositionTitle);
 
     private sealed record Ticket(
         string Sheet,
@@ -348,6 +369,8 @@ public sealed class SourceRsvpParser
         string DisplayName,
         string MatchKey,
         string? Title,
+        string? PostNominal,
+        string? Position,
         EventDay? Day,
         AttendanceState State,
         IReadOnlyList<string> Phones,

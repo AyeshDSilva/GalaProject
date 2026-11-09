@@ -1,15 +1,15 @@
 using System.Text.RegularExpressions;
+using GalaReconciler.Core;
 using GalaReconciler.Core.Matching;
 using GalaReconciler.Core.Parsing;
 using GalaReconciler.Core.Rules;
-using GalaReconciler.Core;
-using GalaReconciler.Web.Features.Reconciliation.Persistence;
 using GalaReconciler.Web.Features.Reconciliation;
+using GalaReconciler.Web.Features.Reconciliation.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace GalaReconciler.Tests.Helpers;
 
@@ -66,16 +66,9 @@ public sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
 
 public static partial class TestHandlers
 {
-    public static CompareFilesHandler CreateCompareFilesHandler() => new(
-        new SourceRsvpParser(),
-        new ProcessedGuestListParser(),
-        new GuestMatcher(),
-        [
-            new DatesMismatchRule(Options.Create(new ComparisonOptions())),
-            new MobileNumberMismatchRule(),
-            new EmailMismatchRule(),
-        ],
-        TimeProvider.System);
+    /// <summary>The handler exactly as both apps register it: every rule, default options.</summary>
+    public static CompareFilesHandler CreateCompareFilesHandler() =>
+        new ServiceCollection().AddComparison().BuildServiceProvider().GetRequiredService<CompareFilesHandler>();
 
     /// <summary>The comparison of the two sample workbooks.</summary>
     public static ReconciliationResult CompareSamples()

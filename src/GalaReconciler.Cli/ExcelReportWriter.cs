@@ -16,13 +16,14 @@ public static class ExcelReportWriter
     private static readonly XLColor DifferingDayFill = XLColor.FromHtml("#FDE68A");
     private static readonly XLColor MutedText = XLColor.FromHtml("#64748B");
 
-    public static void Write(ReconciliationResult result, string path)
+    /// <param name="highlightedCopyName">File name of the highlighted master list, mentioned on the Summary sheet.</param>
+    public static void Write(ReconciliationResult result, string path, string? highlightedCopyName = null)
     {
         using var workbook = new XLWorkbook();
         workbook.Properties.Author = "GALA Reconciler";
         workbook.Properties.Title = "GALA guest list reconciliation";
 
-        AddSummary(workbook.AddWorksheet(SummarySheet), result);
+        AddSummary(workbook.AddWorksheet(SummarySheet), result, highlightedCopyName);
         AddDifferences(workbook.AddWorksheet(DifferencesSheet), result.Discrepancies);
         AddWarnings(workbook.AddWorksheet(WarningsSheet), result.Warnings);
 
@@ -30,15 +31,16 @@ public static class ExcelReportWriter
         workbook.SaveAs(path);
     }
 
-    /// <summary>"✓" attending, "✗" not attending, "–" no response.</summary>
+    /// <summary>"✓" attending, "✗" not attending, "?" invited with no response, "–" no RSVP or not invited.</summary>
     public static string Symbol(AttendanceState state) => state switch
     {
         AttendanceState.Attending => "✓",
         AttendanceState.NotAttending => "✗",
+        AttendanceState.AwaitingResponse => "?",
         _ => "–",
     };
 
-    private static void AddSummary(IXLWorksheet sheet, ReconciliationResult result)
+    private static void AddSummary(IXLWorksheet sheet, ReconciliationResult result, string? highlightedCopyName)
     {
         sheet.Cell("A1").Value = "GALA guest list reconciliation";
         sheet.Cell("A1").Style.Font.SetBold().Font.SetFontSize(16);
@@ -55,6 +57,11 @@ public static class ExcelReportWriter
 
         Line("Source file", result.SourceFileName);
         Line("Processed file", result.ProcessedFileName);
+        if (highlightedCopyName is not null)
+        {
+            Line("Highlighted copy", highlightedCopyName);
+        }
+
         Line("Compared", result.RunAt.ToString("d MMM yyyy, h:mm tt"));
         Line("Guests in Source", result.SourceGuestCount);
         Line("Guests in Processed", result.ProcessedGuestCount);
@@ -86,7 +93,7 @@ public static class ExcelReportWriter
         var notes = new[]
         {
             $"Every difference is listed on the {DifferencesSheet} sheet; use the filter arrows to show one type.",
-            "Day columns: ✓ attending, ✗ not attending, – no response, shown as Source → Processed. Highlighted days differ.",
+            "Day columns, shown as Source → Processed: ✓ attending (Y), ✗ not attending (N), ? invited with no response yet (1), – no RSVP in the export or not invited (blank). Highlighted days differ.",
             "Location gives the sheet and row numbers in each original file.",
         };
         foreach (var note in notes)
@@ -202,7 +209,10 @@ public static class ExcelReportWriter
             DiscrepancyType.GuestNotFound => ("#FFE4E6", "#BE123C"),
             DiscrepancyType.DatesMismatch => ("#FEF3C7", "#92400E"),
             DiscrepancyType.MobileNumberMismatch => ("#E0F2FE", "#0369A1"),
-            _ => ("#EDE9FE", "#6D28D9"),
+            DiscrepancyType.EmailMismatch => ("#EDE9FE", "#6D28D9"),
+            DiscrepancyType.TitleMismatch => ("#CCFBF1", "#0F766E"),
+            DiscrepancyType.PostNominalMismatch => ("#FAE8FF", "#A21CAF"),
+            _ => ("#FFEDD5", "#C2410C"),
         };
         cell.Style.Fill.BackgroundColor = XLColor.FromHtml(fill);
         cell.Style.Font.FontColor = XLColor.FromHtml(text);

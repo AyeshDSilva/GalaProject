@@ -6,17 +6,18 @@ public sealed record CliOptions
     public const string Usage = """
         Usage: GalaReconciler [source.xlsx processed.xlsx] [options]
 
-        Compares the RSVP export (Source) with the master guest list (Processed) and writes
-        the differences to an Excel report.
+        Compares the RSVP export (Source) with the master guest list (Processed). Saves the
+        differences to a results workbook and a highlighted copy of the master list; the original
+        files are never changed.
 
         With no file names, the folder is searched for the two workbooks and they are told
         apart by their column headers, so the files can be called anything.
 
         Options:
           --folder <folder>   Folder to search for the two files (default: the current folder)
-          --output <file>     Where to save the report (default: "GALA Reconciliation <date> <time>.xlsx"
-                              in the folder). Can also be a folder.
-          --strict            Treat "not attending" and "no response" as different
+          --output <file>     Where to save the results (default: "GALA Reconciliation <date> <time>.xlsx"
+                              in the folder). The highlighted copy goes next to it. Can also be a folder.
+          --strict            Also flag days marked N in the master list that have no ticket in the export
           --no-pause          Don't wait for a key press before closing
           -h, --help          Show this help
         """;

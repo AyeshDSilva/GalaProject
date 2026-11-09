@@ -23,6 +23,11 @@ public sealed class GuestRecord
 
     public string? Title { get; set; }
 
+    public string? PostNominal { get; set; }
+
+    /// <summary>Position title. In the master list this can also be a host link ("Guest of Mr …").</summary>
+    public string? Position { get; set; }
+
     /// <summary>Normalized "first last", see <c>NameNormalizer</c>.</summary>
     public required string MatchKey { get; init; }
 
