@@ -1,0 +1,178 @@
+@model RunsViewModel
+@{
+    ViewData["Title"] = "Runs";
+    ViewData["Wide"] = true;
+    var filter = Model.Filter;
+    var inputClasses = "w-full rounded-lg border-0 py-2 px-3 text-sm text-slate-900 ring-1 ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none";
+}
+@functions {
+    static string StatusClasses(RunStatus status) => status switch
+    {
+        RunStatus.Completed => "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
+        RunStatus.Failed => "bg-rose-50 text-rose-700 ring-rose-600/20",
+        RunStatus.Processing => "bg-indigo-50 text-indigo-700 ring-indigo-600/20",
+        _ => "bg-slate-50 text-slate-600 ring-slate-500/20",
+    };
+
+    static string CountClasses(DiscrepancyType type) => type switch
+    {
+        DiscrepancyType.GuestNotFound => "bg-rose-50 text-rose-700",
+        DiscrepancyType.DatesMismatch => "bg-amber-50 text-amber-800",
+        DiscrepancyType.MobileNumberMismatch => "bg-sky-50 text-sky-700",
+        _ => "bg-violet-50 text-violet-700",
+    };
+}
+
+<div class="space-y-6">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Runs</h1>
+            <p class="mt-1 text-sm text-slate-500">Every comparison is saved here, newest first. Runs are deleted automatically after a while.</p>
+        </div>
+        <a asp-action="Index"
+           class="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 sm:ml-auto">
+            New comparison
+        </a>
+    </div>
+
+    <form method="get" asp-action="ListRuns" class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-[2fr_2fr_1fr_1fr_1fr_1fr_auto] lg:items-end">
+        <label class="block">
+            <span class="mb-1 block text-xs font-medium text-slate-600">Guest name</span>
+            <input name="Guest" value="@filter.Guest" type="search" placeholder="e.g. Marco" class="@inputClasses" />
+        </label>
+        <label class="block">
+            <span class="mb-1 block text-xs font-medium text-slate-600">File name</span>
+            <input name="File" value="@filter.File" type="search" placeholder="e.g. RSVP" class="@inputClasses" />
+        </label>
+        <label class="block">
+            <span class="mb-1 block text-xs font-medium text-slate-600">Difference</span>
+            <select name="Type" class="@inputClasses">
+                <option value="">Any</option>
+                @foreach (var type in ReconciliationResultViewModel.Types)
+                {
+                    <option value="@type" selected="@(filter.Type == type)">@type.ToDisplay()</option>
+                }
+            </select>
+        </label>
+        <label class="block">
+            <span class="mb-1 block text-xs font-medium text-slate-600">Status</span>
+            <select name="Status" class="@inputClasses">
+                <option value="">Any</option>
+                @foreach (var status in Enum.GetValues<RunStatus>())
+                {
+                    <option value="@status" selected="@(filter.Status == status)">@status</option>
+                }
+            </select>
+        </label>
+        <label class="block">
+            <span class="mb-1 block text-xs font-medium text-slate-600">From</span>
+            <input name="From" value="@filter.From?.ToString("yyyy-MM-dd")" type="date" class="@inputClasses" />
+        </label>
+        <label class="block">
+            <span class="mb-1 block text-xs font-medium text-slate-600">To</span>
+            <input name="To" value="@filter.To?.ToString("yyyy-MM-dd")" type="date" class="@inputClasses" />
+        </label>
+        <div class="flex items-center gap-3 sm:col-span-2 lg:col-span-1">
+            <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700">Filter</button>
+            @if (!filter.IsEmpty)
+            {
+                <a asp-action="ListRuns" class="text-sm font-medium text-slate-500 hover:text-slate-900">Reset</a>
+            }
+        </div>
+    </form>
+
+    @if (Model.Runs.Count == 0)
+    {
+        <div class="rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
+            <h2 class="text-lg font-semibold text-slate-900">@(filter.IsEmpty ? "No runs yet" : "No runs match these filters")</h2>
+            <p class="mt-1 text-sm text-slate-500">
+                @(filter.IsEmpty ? "Upload the two files to run your first comparison." : "Try removing a filter.")
+            </p>
+        </div>
+    }
+    else
+    {
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <tr>
+                            <th scope="col" class="px-4 py-3">Uploaded</th>
+                            <th scope="col" class="px-4 py-3">Files</th>
+                            <th scope="col" class="px-4 py-3">Status</th>
+                            <th scope="col" class="px-4 py-3">Differences</th>
+                            <th scope="col" class="px-4 py-3 text-right">Matched</th>
+                            <th scope="col" class="px-4 py-3 text-right">Warnings</th>
+                            <th scope="col" class="px-4 py-3"><span class="sr-only">Open</span></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach (var run in Model.Runs)
+                        {
+                            <tr class="align-top transition-colors hover:bg-slate-50/70">
+                                <td class="whitespace-nowrap px-4 py-3 text-slate-700">@RunsViewModel.LocalTime(run.CreatedAtUtc)</td>
+                                <td class="max-w-sm px-4 py-3">
+                                    <div class="truncate font-medium text-slate-900" title="@run.SourceFileName">@run.SourceFileName</div>
+                                    <div class="truncate text-xs text-slate-500" title="@run.ProcessedFileName">@run.ProcessedFileName</div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset @StatusClasses(run.Status)">@run.Status</span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    @if (run.Status == RunStatus.Completed)
+                                    {
+                                        @if (run.DiscrepancyCount == 0)
+                                        {
+                                            <span class="text-emerald-700">None</span>
+                                        }
+                                        else
+                                        {
+                                            <div class="flex flex-wrap gap-1.5">
+                                                @foreach (var type in ReconciliationResultViewModel.Types.Where(t => run.CountOf(t) > 0))
+                                                {
+                                                    <span class="rounded-md px-1.5 py-0.5 text-xs font-medium tabular-nums @CountClasses(type)" title="@type.ToDisplay()">
+                                                        @run.CountOf(type) @type.ToDisplay().ToLowerInvariant()
+                                                    </span>
+                                                }
+                                            </div>
+                                        }
+                                    }
+                                    else if (run.Status == RunStatus.Failed)
+                                    {
+                                        <span class="line-clamp-2 text-xs text-rose-700">@run.ErrorTitle</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-slate-400">—</span>
+                                    }
+                                </td>
+                                <td class="px-4 py-3 text-right tabular-nums text-slate-700">@(run.Status == RunStatus.Completed ? run.MatchedCount.ToString() : "—")</td>
+                                <td class="px-4 py-3 text-right tabular-nums text-slate-700">@(run.Status == RunStatus.Completed ? run.WarningCount.ToString() : "—")</td>
+                                <td class="whitespace-nowrap px-4 py-3 text-right">
+                                    <a asp-action="ShowRun" asp-route-id="@run.Id" class="font-medium text-indigo-600 hover:text-indigo-500">Open</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (Model.TotalPages > 1)
+            {
+                <nav class="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm" aria-label="Pagination">
+                    <span class="text-slate-500">Page @Model.Page of @Model.TotalPages · @Model.TotalCount runs</span>
+                    <div class="flex gap-2">
+                        @if (Model.Page > 1)
+                        {
+                            <a asp-action="ListRuns" asp-all-route-data="@filter.ToRouteValues(Model.Page - 1)" class="rounded-lg px-3 py-1.5 font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50">Previous</a>
+                        }
+                        @if (Model.Page < Model.TotalPages)
+                        {
+                            <a asp-action="ListRuns" asp-all-route-data="@filter.ToRouteValues(Model.Page + 1)" class="rounded-lg px-3 py-1.5 font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50">Next</a>
+                        }
+                    </div>
+                </nav>
+            }
+        </div>
+    }
+</div>

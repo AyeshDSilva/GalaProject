@@ -1,0 +1,7 @@
+@import "tailwindcss";
+@source "../Features/**/*.cshtml";
+@source "../Shared/**/*.cshtml";
+
+@theme {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}

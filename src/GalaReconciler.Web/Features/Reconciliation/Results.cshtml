@@ -1,0 +1,331 @@
+@model ReconciliationResultViewModel
+@{
+    ViewData["Title"] = "Results";
+    ViewData["Wide"] = true;
+    var result = Model.Result;
+    var total = Model.Discrepancies.Count;
+}
+@functions {
+    // Tailwind classes live in the view so the Tailwind CLI can see them.
+    static string BadgeClasses(DiscrepancyType type) => type switch
+    {
+        DiscrepancyType.GuestNotFound => "bg-rose-50 text-rose-700 ring-rose-600/20",
+        DiscrepancyType.DatesMismatch => "bg-amber-50 text-amber-800 ring-amber-600/25",
+        DiscrepancyType.MobileNumberMismatch => "bg-sky-50 text-sky-700 ring-sky-600/20",
+        _ => "bg-violet-50 text-violet-700 ring-violet-600/20",
+    };
+
+    static string DotClasses(DiscrepancyType type) => type switch
+    {
+        DiscrepancyType.GuestNotFound => "bg-rose-500",
+        DiscrepancyType.DatesMismatch => "bg-amber-500",
+        DiscrepancyType.MobileNumberMismatch => "bg-sky-500",
+        _ => "bg-violet-500",
+    };
+
+    static string CardDescription(DiscrepancyType type) => type switch
+    {
+        DiscrepancyType.GuestNotFound => "In one file only",
+        DiscrepancyType.DatesMismatch => "Attendance differs",
+        DiscrepancyType.MobileNumberMismatch => "Phone numbers differ",
+        _ => "Email addresses differ",
+    };
+
+    static (string Symbol, string Classes) DayState(AttendanceState state) => state switch
+    {
+        AttendanceState.Attending => ("✓", "bg-emerald-50 text-emerald-700"),
+        AttendanceState.NotAttending => ("✕", "bg-slate-100 text-slate-500"),
+        _ => ("–", "bg-white text-slate-300 ring-1 ring-inset ring-slate-200"),
+    };
+}
+
+@{
+    void DayGrid(Discrepancy discrepancy, bool source)
+    {
+        <div class="inline-grid gap-1 text-center" style="grid-template-columns: repeat(@discrepancy.Days.Count, 2.25rem)"
+             role="table" aria-label="@(source ? "Source" : "Processed") attendance by day">
+            @foreach (var day in discrepancy.Days)
+            {
+                var info = EventDays.Get(day.Day);
+                var state = source ? day.Source : day.Processed;
+                var (symbol, classes) = DayState(state);
+                <div role="cell">
+                    <div class="text-[10px] font-medium uppercase tracking-wide @(day.IsDifferent ? "text-amber-700" : "text-slate-400")">@info.ShortLabel</div>
+                    <div class="mt-0.5 rounded-md py-0.5 text-xs font-semibold @classes @(day.IsDifferent ? "ring-2 ring-inset ring-amber-400" : "")"
+                         title="@info.TicketTypeLabel: @state.ToDisplay()">@symbol</div>
+                </div>
+            }
+        </div>
+    }
+
+    void Values(Discrepancy discrepancy, string? value, string? otherValue)
+    {
+        var lines = ReconciliationResultViewModel.Lines(value);
+        if (lines.Count == 0)
+        {
+            <span class="text-slate-400">—</span>
+            return;
+        }
+
+        // For phones and emails, highlight values the other file doesn't have.
+        var compare = discrepancy.Type is DiscrepancyType.MobileNumberMismatch or DiscrepancyType.EmailMismatch;
+        var other = ReconciliationResultViewModel.Lines(otherValue).ToHashSet();
+        <ul class="space-y-0.5">
+            @foreach (var line in lines)
+            {
+                var differs = compare && other.Count > 0 && !other.Contains(line);
+                <li class="@(differs ? "w-fit rounded bg-amber-100 px-1 -mx-1 font-medium text-amber-900" : "") break-words">@line</li>
+            }
+        </ul>
+    }
+}
+
+<div class="space-y-6">
+    @* Header *@
+    <div class="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:flex-row lg:items-center">
+        <div class="min-w-0 flex-1">
+            <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Reconciliation results</h1>
+            <dl class="mt-3 grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-[auto_1fr]">
+                <dt class="text-slate-500">Source</dt>
+                <dd class="min-w-0 truncate font-medium text-slate-800" title="@result.SourceFileName">@result.SourceFileName</dd>
+                <dt class="text-slate-500">Processed</dt>
+                <dd class="min-w-0 truncate font-medium text-slate-800" title="@result.ProcessedFileName">@result.ProcessedFileName</dd>
+                <dt class="text-slate-500">Run</dt>
+                <dd class="text-slate-700">@Model.RunAtDisplay <span class="text-slate-400">· took @Model.DurationDisplay</span></dd>
+            </dl>
+            <p class="mt-3 text-sm text-slate-500">
+                <span class="font-medium text-slate-700">@result.SourceGuestCount</span> guests in Source ·
+                <span class="font-medium text-slate-700">@result.ProcessedGuestCount</span> in Processed ·
+                <span class="font-medium text-slate-700">@result.MatchedCount</span> matched
+            </p>
+        </div>
+        <div class="flex shrink-0 flex-col-reverse gap-3 sm:flex-row sm:items-center">
+            <form asp-action="DeleteRun" asp-route-id="@Model.RunId" method="post" onsubmit="return confirm('Delete this run and its results?');">
+                <button type="submit" class="text-sm font-medium text-slate-500 hover:text-rose-700">Delete run</button>
+            </form>
+            <a asp-action="ListRuns" class="text-sm font-medium text-slate-600 hover:text-slate-900">All runs</a>
+            <a asp-action="Index"
+               class="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M20 16v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2" />
+                </svg>
+                Compare new files
+            </a>
+        </div>
+    </div>
+
+    @* Warnings *@
+    @if (result.Warnings.Count > 0)
+    {
+        <details class="group rounded-2xl border border-amber-200 bg-amber-50/60">
+            <summary class="flex cursor-pointer list-none items-center gap-3 px-5 py-3.5 text-sm font-medium text-amber-900 [&::-webkit-details-marker]:hidden">
+                <svg class="size-5 shrink-0 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4" /><path d="M12 17h.01" />
+                </svg>
+                @result.Warnings.Count @(result.Warnings.Count == 1 ? "warning" : "warnings") while reading the files
+                <svg class="ml-auto size-4 text-amber-700 transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="m6 9 6 6 6-6" />
+                </svg>
+            </summary>
+            <div class="space-y-4 border-t border-amber-200 px-5 py-4">
+                @foreach (var file in Model.WarningsByFile)
+                {
+                    <div>
+                        <h3 class="text-xs font-semibold uppercase tracking-wide text-amber-800">@file.Key file</h3>
+                        <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">
+                            @foreach (var warning in file)
+                            {
+                                <li>@warning.Message</li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </div>
+        </details>
+    }
+
+    @if (total == 0)
+    {
+        <div class="rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
+            <span class="mx-auto grid size-14 place-items-center rounded-full bg-emerald-50 text-emerald-600">
+                <svg class="size-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+            </span>
+            <h2 class="mt-4 text-lg font-semibold text-slate-900">No differences found</h2>
+            <p class="mx-auto mt-1 max-w-md text-sm text-slate-500">
+                All @result.MatchedCount matched guests have the same days, mobile numbers and emails in both files.
+            </p>
+        </div>
+    }
+    else
+    {
+        @* Summary cards (filters) *@
+        <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            @foreach (var type in ReconciliationResultViewModel.Types)
+            {
+                var count = Model.CountOf(type);
+                <button type="button" data-filter="@type" aria-pressed="false"
+                        class="group rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-slate-300 hover:shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 aria-pressed:border-indigo-500 aria-pressed:ring-2 aria-pressed:ring-indigo-500/30">
+                    <span class="flex items-center gap-2 text-sm font-medium text-slate-600">
+                        <span class="size-2 rounded-full @DotClasses(type)"></span>
+                        @type.ToDisplay()
+                    </span>
+                    <span class="mt-2 block text-3xl font-semibold tabular-nums @(count == 0 ? "text-slate-300" : "text-slate-900")">@count</span>
+                    <span class="mt-0.5 block text-xs text-slate-500">@CardDescription(type)</span>
+                </button>
+            }
+        </div>
+
+        @* Table *@
+        <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 sm:flex-row sm:items-center">
+                <div class="flex items-center gap-3">
+                    <button type="button" data-filter="All" aria-pressed="true"
+                            class="rounded-full px-3 py-1 text-sm font-medium text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 aria-pressed:bg-indigo-600 aria-pressed:text-white aria-pressed:ring-indigo-600">
+                        All <span class="tabular-nums">(@total)</span>
+                    </button>
+                    <span class="text-sm text-slate-500">Showing <span id="visible-count" class="font-medium tabular-nums text-slate-700">@total</span> of @total</span>
+                </div>
+                <div class="relative sm:ml-auto sm:w-72">
+                    <svg class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+                    </svg>
+                    <input id="search" type="search" placeholder="Search by name" autocomplete="off" aria-label="Search by guest or host name"
+                           class="w-full rounded-lg border-0 py-2 pl-9 pr-3 text-sm text-slate-900 ring-1 ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-slate-100 bg-slate-50/60 px-4 py-2 text-xs text-slate-500">
+                <span class="font-medium text-slate-600">Day grid:</span>
+                <span class="inline-flex items-center gap-1"><span class="rounded bg-emerald-50 px-1 font-semibold text-emerald-700">✓</span> Attending</span>
+                <span class="inline-flex items-center gap-1"><span class="rounded bg-slate-100 px-1 font-semibold text-slate-500">✕</span> Not attending</span>
+                <span class="inline-flex items-center gap-1"><span class="rounded bg-white px-1 font-semibold text-slate-300 ring-1 ring-inset ring-slate-200">–</span> No response</span>
+                <span class="inline-flex items-center gap-1"><span class="size-3.5 rounded ring-2 ring-inset ring-amber-400"></span> Differs</span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <tr>
+                            <th scope="col" class="px-4 py-3">Type</th>
+                            <th scope="col" class="px-4 py-3">Guest</th>
+                            <th scope="col" class="px-4 py-3">Guest of</th>
+                            <th scope="col" class="px-4 py-3">Details</th>
+                            <th scope="col" class="px-4 py-3">Source</th>
+                            <th scope="col" class="px-4 py-3">Processed</th>
+                            <th scope="col" class="px-4 py-3">Location</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach (var d in Model.Discrepancies)
+                        {
+                            var search = $"{d.GuestDisplayName} {d.SourceDisplayName} {d.HostDisplayName}".ToLowerInvariant();
+                            <tr data-row data-type="@d.Type" data-search="@search" class="align-top transition-colors hover:bg-slate-50/70">
+                                <td class="whitespace-nowrap px-4 py-3">
+                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset @BadgeClasses(d.Type)">@d.Type.ToDisplay()</span>
+                                </td>
+                                <td class="min-w-44 px-4 py-3">
+                                    <div class="flex items-start gap-1.5">
+                                        @if (d.HostDisplayName is not null)
+                                        {
+                                            <span class="text-slate-300" aria-hidden="true">↳</span>
+                                        }
+                                        <div class="min-w-0">
+                                            <div class="font-medium text-slate-900">@d.GuestDisplayName</div>
+                                            @if (d.SourceDisplayName is not null)
+                                            {
+                                                <div class="text-xs text-slate-500">Source: @d.SourceDisplayName</div>
+                                            }
+                                            @if (d.MatchedBy == MatchMethod.Email)
+                                            {
+                                                <span class="mt-1 inline-flex items-center gap-1 rounded-md bg-indigo-50 px-1.5 py-0.5 text-[11px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20">
+                                                    <svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
+                                                    matched by email
+                                                </span>
+                                            }
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="min-w-36 px-4 py-3 text-slate-700">@(d.HostDisplayName ?? "—")</td>
+                                <td class="min-w-48 px-4 py-3 text-slate-700">
+                                    <div>@d.Detail</div>
+                                    @if (d.PossibleMatch is not null)
+                                    {
+                                        <div class="mt-1.5 w-fit rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-800 ring-1 ring-inset ring-amber-600/20">
+                                            Possible match: <span class="font-medium">@d.PossibleMatch</span>
+                                        </div>
+                                    }
+                                </td>
+                                @if (d.Type == DiscrepancyType.DatesMismatch)
+                                {
+                                    <td class="px-4 py-3">@{ DayGrid(d, source: true); }</td>
+                                    <td class="px-4 py-3">@{ DayGrid(d, source: false); }</td>
+                                }
+                                else
+                                {
+                                    <td class="min-w-52 px-4 py-3 text-slate-700">@{ Values(d, d.SourceValue, d.ProcessedValue); }</td>
+                                    <td class="min-w-52 px-4 py-3 text-slate-700">@{ Values(d, d.ProcessedValue, d.SourceValue); }</td>
+                                }
+                                <td class="min-w-56 px-4 py-3 text-xs text-slate-500">
+                                    @foreach (var line in ReconciliationResultViewModel.FormatLocation(d.SourceRows))
+                                    {
+                                        <div><span class="font-semibold text-slate-600">Source</span> · @line</div>
+                                    }
+                                    @foreach (var line in ReconciliationResultViewModel.FormatLocation(d.ProcessedRows))
+                                    {
+                                        <div><span class="font-semibold text-slate-600">Processed</span> · @line</div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="no-matches" hidden class="px-6 py-12 text-center text-sm text-slate-500">
+                No differences match your filter.
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        (() => {
+            const rows = [...document.querySelectorAll('[data-row]')];
+            if (rows.length === 0) return;
+
+            const filters = [...document.querySelectorAll('[data-filter]')];
+            const search = document.getElementById('search');
+            const visibleCount = document.getElementById('visible-count');
+            const noMatches = document.getElementById('no-matches');
+            let active = 'All';
+
+            function apply() {
+                const query = search.value.trim().toLowerCase();
+                let visible = 0;
+                for (const row of rows) {
+                    const show = (active === 'All' || row.dataset.type === active)
+                        && (query === '' || row.dataset.search.includes(query));
+                    row.hidden = !show;
+                    if (show) visible++;
+                }
+                for (const filter of filters) {
+                    filter.setAttribute('aria-pressed', String(filter.dataset.filter === active));
+                }
+                visibleCount.textContent = visible;
+                noMatches.hidden = visible !== 0;
+            }
+
+            for (const filter of filters) {
+                filter.addEventListener('click', () => {
+                    // Clicking the active card again goes back to All.
+                    const value = filter.dataset.filter;
+                    active = value !== 'All' && value === active ? 'All' : value;
+                    apply();
+                });
+            }
+
+            search.addEventListener('input', apply);
+        })();
+    </script>
+}

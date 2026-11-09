@@ -1,0 +1,131 @@
+using System.Text.RegularExpressions;
+using GalaReconciler.Web.Features.Reconciliation;
+using GalaReconciler.Web.Features.Reconciliation.Matching;
+using GalaReconciler.Web.Features.Reconciliation.Parsing;
+using GalaReconciler.Web.Features.Reconciliation.Persistence;
+using GalaReconciler.Web.Features.Reconciliation.Rules;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+
+namespace GalaReconciler.Tests.Helpers;
+
+/// <summary>The real app, with its SQLite database in a throwaway temp file.</summary>
+public sealed class GalaWebApplicationFactory : WebApplicationFactory<Program>
+{
+    private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"gala-tests-{Guid.NewGuid():N}.db");
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder) =>
+        builder.UseSetting($"ConnectionStrings:{ReconciliationServiceCollectionExtensions.ConnectionStringName}", $"Data Source={_databasePath}");
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        SqliteConnection.ClearAllPools();
+        try
+        {
+            File.Delete(_databasePath);
+        }
+        catch (IOException)
+        {
+            // Best effort; it's in the temp folder.
+        }
+    }
+}
+
+/// <summary>A migrated in-memory SQLite database that lives as long as this object.</summary>
+public sealed class TestDatabase : IDisposable
+{
+    private readonly SqliteConnection _connection = new("Data Source=:memory:");
+
+    public TestDatabase()
+    {
+        _connection.Open();
+        using var db = CreateContext();
+        db.Database.Migrate();
+    }
+
+    public DbContextOptions<ReconciliationDbContext> Options =>
+        new DbContextOptionsBuilder<ReconciliationDbContext>().UseSqlite(_connection).Options;
+
+    public ReconciliationDbContext CreateContext() => new(Options);
+
+    public void Dispose() => _connection.Dispose();
+}
+
+/// <summary>A clock the test controls.</summary>
+public sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
+{
+    public DateTimeOffset Now { get; set; } = now;
+
+    public override DateTimeOffset GetUtcNow() => Now;
+}
+
+public static partial class TestHandlers
+{
+    public static CompareFilesHandler CreateCompareFilesHandler() => new(
+        new SourceRsvpParser(),
+        new ProcessedGuestListParser(),
+        new GuestMatcher(),
+        [
+            new DatesMismatchRule(Options.Create(new ReconciliationOptions())),
+            new MobileNumberMismatchRule(),
+            new EmailMismatchRule(),
+        ],
+        TimeProvider.System);
+
+    /// <summary>The comparison of the two sample workbooks.</summary>
+    public static ReconciliationResult CompareSamples()
+    {
+        using var source = SampleWorkbookBuilder.Source().ToStream();
+        using var processed = SampleWorkbookBuilder.Processed().ToStream();
+        return CreateCompareFilesHandler().Handle(new CompareFilesRequest(source, "Source.xlsx", processed, "Processed.xlsx"));
+    }
+
+    /// <summary>Posts both files through the real upload form and returns the run page URL it redirects to.</summary>
+    public static async Task<string> UploadAsync(HttpClient client, Stream sourceFile, Stream processedFile)
+    {
+        var form = await client.GetStringAsync("/");
+        var token = AntiforgeryToken().Match(form).Groups[1].Value;
+
+        using var content = new MultipartFormDataContent
+        {
+            { new StringContent(token), "__RequestVerificationToken" },
+            { new StreamContent(sourceFile), "SourceFile", "Source.xlsx" },
+            { new StreamContent(processedFile), "ProcessedFile", "Processed.xlsx" },
+        };
+        var response = await client.PostAsync("/Reconciliation/Compare", content);
+
+        Assert.Equal(System.Net.HttpStatusCode.Redirect, response.StatusCode);
+        return response.Headers.Location!.OriginalString;
+    }
+
+    public static Task<string> UploadSamplesAsync(HttpClient client) =>
+        UploadAsync(client, SampleWorkbookBuilder.Source().ToStream(), SampleWorkbookBuilder.Processed().ToStream());
+
+    /// <summary>Polls the run page until the background worker has finished with it.</summary>
+    public static async Task<string> WaitForRunAsync(HttpClient client, string runUrl)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (true)
+        {
+            var html = await client.GetStringAsync(runUrl);
+            if (!html.Contains("data-status-label"))
+            {
+                return html;
+            }
+
+            if (DateTime.UtcNow > deadline)
+            {
+                throw new TimeoutException($"Run {runUrl} didn't finish.");
+            }
+
+            await Task.Delay(100);
+        }
+    }
+
+    [GeneratedRegex("name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"")]
+    private static partial Regex AntiforgeryToken();
+}

@@ -1,0 +1,45 @@
+@{
+    // Pages with wide tables (results) set ViewData["Wide"] = true.
+    var container = ViewData["Wide"] is true ? "max-w-[96rem]" : "max-w-7xl";
+}
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@(ViewData["Title"] is string title ? $"{title} · GALA Reconciler" : "GALA Reconciler")</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="flex min-h-full flex-col bg-slate-50 font-sans text-slate-900 antialiased">
+    <header class="border-b border-slate-200 bg-white">
+        <div class="mx-auto flex h-14 w-full @container items-center gap-3 px-4 sm:px-6 lg:px-8">
+            <a asp-controller="Reconciliation" asp-action="Index" class="flex items-center gap-2.5 font-semibold tracking-tight text-slate-900">
+                <span class="grid size-8 place-items-center rounded-lg bg-indigo-600 text-white shadow-sm">
+                    <svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+                        <rect x="9" y="3" width="6" height="4" rx="1" />
+                        <path d="m9 14 2 2 4-4" />
+                    </svg>
+                </span>
+                GALA Reconciler
+            </a>
+            <nav class="ml-auto flex items-center gap-1 text-sm font-medium">
+                <a asp-controller="Reconciliation" asp-action="Index" class="rounded-md px-3 py-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900">New comparison</a>
+                <a asp-controller="Reconciliation" asp-action="ListRuns" class="rounded-md px-3 py-1.5 text-slate-600 hover:bg-slate-100 hover:text-slate-900">Runs</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="mx-auto w-full @container flex-1 px-4 py-8 sm:px-6 lg:px-8">
+        @RenderBody()
+    </main>
+
+    <footer class="border-t border-slate-200 bg-white">
+        <div class="mx-auto w-full @container px-4 py-4 text-xs text-slate-500 sm:px-6 lg:px-8">
+            Uploaded files are processed in memory and never stored. Only the comparison results are saved.
+        </div>
+    </footer>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

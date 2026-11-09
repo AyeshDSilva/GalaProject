@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.105.1" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.14">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.14" />
+  </ItemGroup>
+
+  <!--
+    Client assets built with npm before every build: Tailwind CSS v4 (CLI) and the SignalR browser client.
+    Pass -p:SkipClientAssets=true to skip, e.g. when Node isn't installed (the files must then already exist).
+  -->
+  <PropertyGroup>
+    <TailwindInput>Styles/app.css</TailwindInput>
+    <TailwindOutput>wwwroot/css/site.css</TailwindOutput>
+    <SignalROutput>wwwroot/lib/signalr/signalr.min.js</SignalROutput>
+    <!-- Evaluated before any target runs: false on a clean checkout, when wwwroot's glob can't have picked the files up yet. -->
+    <ClientAssetsExisted Condition="Exists('$(TailwindOutput)') And Exists('$(SignalROutput)')">true</ClientAssetsExisted>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ClientAssetSource Include="$(TailwindInput);Features/**/*.cshtml;Shared/**/*.cshtml;package.json" />
+    <None Remove="node_modules/**" />
+    <Content Remove="node_modules/**" />
+    <Content Remove="package.json;package-lock.json" />
+    <None Include="package.json;package-lock.json" />
+  </ItemGroup>
+
+  <Target Name="ClientAssetsNpmInstall"
+          Condition="'$(SkipClientAssets)' != 'true' And '$(DesignTimeBuild)' != 'true' And (!Exists('node_modules/@tailwindcss/cli') Or !Exists('node_modules/@microsoft/signalr'))">
+    <Message Importance="high" Text="Installing npm packages for client assets..." />
+    <Exec Command="npm install" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
+  <Target Name="ClientAssetsBuild"
+          BeforeTargets="BeforeBuild"
+          DependsOnTargets="ClientAssetsNpmInstall"
+          Condition="'$(SkipClientAssets)' != 'true' And '$(DesignTimeBuild)' != 'true'"
+          Inputs="@(ClientAssetSource)"
+          Outputs="$(TailwindOutput);$(SignalROutput)">
+    <Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <!-- On a clean checkout, add the freshly generated files so they're served and published. -->
+    <ItemGroup Condition="'$(ClientAssetsExisted)' != 'true'">
+      <Content Include="$(TailwindOutput);$(SignalROutput)" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+
+</Project>

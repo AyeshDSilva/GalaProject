@@ -1,0 +1,21 @@
+@{
+    var statusCode = ViewData["StatusCode"] as int? ?? 500;
+    var (heading, message) = statusCode switch
+    {
+        404 => ("Page not found", "The page you were looking for doesn't exist."),
+        413 => ("Files too large", "Each file must be 10 MB or smaller."),
+        400 => ("Bad request", "The request couldn't be processed. If you were uploading files, check each one is 10 MB or smaller and try again."),
+        _ => ("Something went wrong", "An unexpected error occurred. Please try again."),
+    };
+    ViewData["Title"] = heading;
+}
+
+<div class="mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+    <p class="text-sm font-semibold text-indigo-600">Error @statusCode</p>
+    <h1 class="mt-2 text-2xl font-semibold tracking-tight">@heading</h1>
+    <p class="mt-2 text-slate-600">@message</p>
+    <a asp-controller="Reconciliation" asp-action="Index"
+       class="mt-6 inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+        Back to upload
+    </a>
+</div>

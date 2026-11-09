@@ -1,0 +1,185 @@
+@model UploadFilesViewModel
+@{
+    ViewData["Title"] = "Upload files";
+
+    string? FieldError(string field) =>
+        ViewData.ModelState.TryGetValue(field, out var entry) ? entry.Errors.FirstOrDefault()?.ErrorMessage : null;
+
+    void DropZone(string field, string title, string description)
+    {
+        var error = FieldError(field);
+        <div class="flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" data-file-card data-label="@title">
+            <div class="mb-4">
+                <h2 class="text-base font-semibold text-slate-900">@title</h2>
+                <p class="mt-1 text-sm text-slate-500">@description</p>
+            </div>
+
+            <label for="@field" data-dropzone
+                   class="group flex flex-1 cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center transition-colors hover:border-indigo-400 hover:bg-indigo-50/40 has-focus-visible:border-indigo-500 has-focus-visible:ring-2 has-focus-visible:ring-indigo-500/30 has-[[aria-invalid=true]]:border-rose-300 has-[[aria-invalid=true]]:bg-rose-50/40 data-dragging:border-indigo-500 data-dragging:bg-indigo-50">
+                <span class="grid size-12 place-items-center rounded-full bg-white text-slate-400 shadow-sm ring-1 ring-slate-200 transition-colors group-hover:text-indigo-500 group-data-dragging:text-indigo-500">
+                    <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M20 16v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2" />
+                    </svg>
+                </span>
+                <span class="text-sm text-slate-600">
+                    <span class="font-semibold text-indigo-600">Choose a file</span> or drag and drop
+                </span>
+                <span class="text-xs text-slate-500">.xlsx only, up to 10 MB</span>
+                <input id="@field" name="@field" type="file" class="sr-only" data-file-input
+                       accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                       aria-describedby="@(field)-error" aria-invalid="@(error is null ? null : "true")" />
+            </label>
+
+            <div class="mt-3 hidden" data-file-info>
+                <div class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+                    <svg class="size-5 shrink-0 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="m9 13 2 2 4-4" />
+                    </svg>
+                    <span class="min-w-0 truncate font-medium text-slate-800" data-file-name></span>
+                    <span class="ml-auto shrink-0 tabular-nums text-slate-500" data-file-size></span>
+                </div>
+            </div>
+
+            <p id="@(field)-error" class="mt-2 min-h-5 text-sm text-rose-600" data-file-error>@error</p>
+        </div>
+    }
+}
+
+<div class="mx-auto max-w-5xl">
+    <div class="mb-8">
+        <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Compare guest lists</h1>
+        <p class="mt-2 max-w-3xl text-slate-600">
+            Upload the RSVP export from the ticketing system and the master guest list. Differences in attendance days,
+            mobile numbers and email addresses are listed so you can update the master list.
+        </p>
+    </div>
+
+    @if (Model.Error is { } uploadError)
+    {
+        <div class="mb-6 rounded-xl border border-rose-200 bg-rose-50 p-4" role="alert">
+            <div class="flex gap-3">
+                <svg class="mt-0.5 size-5 shrink-0 text-rose-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" /><path d="M12 8v4" /><path d="M12 16h.01" />
+                </svg>
+                <div class="min-w-0">
+                    <h2 class="text-sm font-semibold text-rose-800">@uploadError.Title</h2>
+                    <p class="mt-1 text-sm text-rose-700">@uploadError.Message</p>
+                    @if (uploadError.MissingHeaders.Count > 0)
+                    {
+                        <div class="mt-3 flex flex-wrap gap-1.5">
+                            @foreach (var header in uploadError.MissingHeaders)
+                            {
+                                <code class="rounded-md bg-white px-2 py-0.5 font-mono text-xs text-rose-700 ring-1 ring-rose-200">@header</code>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    <form id="upload-form" asp-action="Compare" method="post" enctype="multipart/form-data" novalidate>
+        @Html.AntiForgeryToken()
+
+        <div class="grid gap-6 md:grid-cols-2">
+            @{
+                DropZone(nameof(UploadFilesViewModel.SourceFile), "Source file (RSVP export)", "The ticketing system export. Every sheet is read, one row per ticket per day.");
+                DropZone(nameof(UploadFilesViewModel.ProcessedFile), "Processed file (master guest list)", "The hand-maintained master list. The first sheet is read, one row per guest.");
+            }
+        </div>
+
+        <div class="mt-8 flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
+            <p class="text-sm text-slate-500 sm:mr-auto">Files stay in memory and are never saved. The results are kept under Runs.</p>
+            <button type="submit" data-submit
+                    class="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-wait disabled:opacity-75">
+                <svg class="hidden size-4 animate-spin" data-spinner viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
+                </svg>
+                <span data-submit-label>Compare</span>
+            </button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        (() => {
+            const maxBytes = @UploadFilesViewModel.MaxFileBytes;
+            const form = document.getElementById('upload-form');
+            const cards = [...form.querySelectorAll('[data-file-card]')];
+            const submit = form.querySelector('[data-submit]');
+
+            const formatSize = (bytes) =>
+                bytes < 1024 ? `${bytes} B`
+                : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB`
+                : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+            function render(card) {
+                const file = card.querySelector('[data-file-input]').files[0];
+                card.querySelector('[data-file-info]').classList.toggle('hidden', !file);
+                card.querySelector('[data-file-name]').textContent = file ? file.name : '';
+                card.querySelector('[data-file-size]').textContent = file ? formatSize(file.size) : '';
+            }
+
+            function validate(card) {
+                const file = card.querySelector('[data-file-input]').files[0];
+                const label = card.dataset.label;
+                let error = '';
+                if (!file) error = `Choose the ${label}.`;
+                else if (!file.name.toLowerCase().endsWith('.xlsx')) error = `The ${label} must be an .xlsx file.`;
+                else if (file.size === 0) error = `The ${label} is empty.`;
+                else if (file.size > maxBytes) error = `The ${label} must be 10 MB or smaller.`;
+
+                card.querySelector('[data-file-error]').textContent = error;
+                const input = card.querySelector('[data-file-input]');
+                if (error) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
+                return !error;
+            }
+
+            for (const card of cards) {
+                const zone = card.querySelector('[data-dropzone]');
+                const input = card.querySelector('[data-file-input]');
+
+                input.addEventListener('change', () => { render(card); validate(card); });
+
+                zone.addEventListener('dragenter', (e) => { e.preventDefault(); zone.dataset.dragging = ''; });
+                zone.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; zone.dataset.dragging = ''; });
+                zone.addEventListener('dragleave', (e) => { if (!zone.contains(e.relatedTarget)) delete zone.dataset.dragging; });
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    delete zone.dataset.dragging;
+                    const file = e.dataTransfer.files[0];
+                    if (!file) return;
+                    const transfer = new DataTransfer();
+                    transfer.items.add(file);
+                    input.files = transfer.files;
+                    input.dispatchEvent(new Event('change'));
+                });
+            }
+
+            // Stop the browser opening a file that's dropped outside a drop zone.
+            window.addEventListener('dragover', (e) => e.preventDefault());
+            window.addEventListener('drop', (e) => e.preventDefault());
+
+            form.addEventListener('submit', (e) => {
+                const valid = cards.map(validate).every(Boolean);
+                if (!valid) {
+                    e.preventDefault();
+                    return;
+                }
+                submit.disabled = true;
+                submit.querySelector('[data-spinner]').classList.remove('hidden');
+                submit.querySelector('[data-submit-label]').textContent = 'Uploading…';
+            });
+
+            // Coming back with the browser's Back button restores the page from cache; reset the button.
+            window.addEventListener('pageshow', () => {
+                submit.disabled = false;
+                submit.querySelector('[data-spinner]').classList.add('hidden');
+                submit.querySelector('[data-submit-label]').textContent = 'Compare';
+                cards.forEach(render);
+            });
+        })();
+    </script>
+}

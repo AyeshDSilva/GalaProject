@@ -1,0 +1,19 @@
+{
+  "name": "gala-reconciler-web",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Client assets for GALA Reconciler: Tailwind CSS build and the SignalR browser client",
+  "scripts": {
+    "build": "npm run build:css && npm run build:js",
+    "build:css": "tailwindcss -i ./Styles/app.css -o ./wwwroot/css/site.css --minify",
+    "build:js": "node -e \"const fs = require('fs'); fs.mkdirSync('wwwroot/lib/signalr', { recursive: true }); fs.copyFileSync('node_modules/@microsoft/signalr/dist/browser/signalr.min.js', 'wwwroot/lib/signalr/signalr.min.js');\"",
+    "watch:css": "tailwindcss -i ./Styles/app.css -o ./wwwroot/css/site.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.5",
+    "tailwindcss": "^4.3.5"
+  },
+  "dependencies": {
+    "@microsoft/signalr": "^10.0.11"
+  }
+}
