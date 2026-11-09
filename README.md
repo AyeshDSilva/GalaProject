@@ -18,6 +18,9 @@ It comes in two forms that share the same comparison code:
 
 Both read the uploaded workbooks in memory only and never store the input files.
 
+Changing the code? The [developer guide](docs/DEVELOPER-GUIDE.md) shows where everything is and has step-by-step
+recipes for renaming columns, reading new columns, changing comparison logic and adding checks.
+
 ## Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
