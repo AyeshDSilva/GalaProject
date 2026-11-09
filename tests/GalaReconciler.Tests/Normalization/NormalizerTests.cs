@@ -1,4 +1,4 @@
-using GalaReconciler.Web.Features.Reconciliation.Normalization;
+using GalaReconciler.Core.Normalization;
 
 namespace GalaReconciler.Tests.Normalization;
 

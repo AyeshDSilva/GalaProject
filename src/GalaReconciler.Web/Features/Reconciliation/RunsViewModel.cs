@@ -1,4 +1,4 @@
-using GalaReconciler.Web.Features.Reconciliation.Domain;
+using GalaReconciler.Core.Domain;
 using GalaReconciler.Web.Features.Reconciliation.Persistence;
 
 namespace GalaReconciler.Web.Features.Reconciliation;

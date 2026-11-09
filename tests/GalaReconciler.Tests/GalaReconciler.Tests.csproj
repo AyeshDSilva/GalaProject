@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\GalaReconciler.Web\GalaReconciler.Web.csproj" />
+    <ProjectReference Include="..\..\src\GalaReconciler.Cli\GalaReconciler.Cli.csproj" />
   </ItemGroup>
 
 </Project>

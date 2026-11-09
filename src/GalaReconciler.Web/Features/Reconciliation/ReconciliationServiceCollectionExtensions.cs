@@ -1,12 +1,9 @@
+using GalaReconciler.Core;
 using GalaReconciler.Web.Features.Reconciliation.Background;
-using GalaReconciler.Web.Features.Reconciliation.Matching;
-using GalaReconciler.Web.Features.Reconciliation.Parsing;
 using GalaReconciler.Web.Features.Reconciliation.Persistence;
 using GalaReconciler.Web.Features.Reconciliation.Realtime;
-using GalaReconciler.Web.Features.Reconciliation.Rules;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace GalaReconciler.Web.Features.Reconciliation;
 
@@ -17,19 +14,14 @@ public static class ReconciliationServiceCollectionExtensions
 
     public static IServiceCollection AddReconciliation(this IServiceCollection services, IConfiguration configuration)
     {
-        services.Configure<ReconciliationOptions>(configuration.GetSection(ReconciliationOptions.SectionName));
-        services.TryAddSingleton(TimeProvider.System);
+        // Both option classes read the same "Reconciliation" section: StrictNotAttending is a comparison
+        // setting shared with the console app; the rest are web-only.
+        var section = configuration.GetSection(ReconciliationOptions.SectionName);
+        services.Configure<ReconciliationOptions>(section);
+        services.Configure<ComparisonOptions>(section);
 
-        services.AddSingleton<SourceRsvpParser>();
-        services.AddSingleton<ProcessedGuestListParser>();
-        services.AddSingleton<GuestMatcher>();
-
-        // Rules run in this order for every matched pair. Register new rules here.
-        services.AddSingleton<IDiscrepancyRule, DatesMismatchRule>();
-        services.AddSingleton<IDiscrepancyRule, MobileNumberMismatchRule>();
-        services.AddSingleton<IDiscrepancyRule, EmailMismatchRule>();
-
-        services.AddScoped<CompareFilesHandler>();
+        // Parsers, matcher, rules and CompareFilesHandler, shared with the console app.
+        services.AddComparison();
 
         // Saved runs (results only) in SQLite. The connection string is resolved when the context is
         // created so test hosts can override it.

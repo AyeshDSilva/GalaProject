@@ -1,8 +1,9 @@
+using GalaReconciler.Core.Domain;
+using GalaReconciler.Core;
 using GalaReconciler.Tests.Helpers;
-using GalaReconciler.Web.Features.Reconciliation;
 using GalaReconciler.Web.Features.Reconciliation.Background;
-using GalaReconciler.Web.Features.Reconciliation.Domain;
 using GalaReconciler.Web.Features.Reconciliation.Persistence;
+using GalaReconciler.Web.Features.Reconciliation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;

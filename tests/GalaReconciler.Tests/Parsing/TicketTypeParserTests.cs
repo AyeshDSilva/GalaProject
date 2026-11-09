@@ -1,5 +1,5 @@
-using GalaReconciler.Web.Features.Reconciliation.Domain;
-using GalaReconciler.Web.Features.Reconciliation.Parsing;
+using GalaReconciler.Core.Domain;
+using GalaReconciler.Core.Parsing;
 
 namespace GalaReconciler.Tests.Parsing;
 

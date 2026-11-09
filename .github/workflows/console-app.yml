@@ -1,0 +1,66 @@
+# Builds GalaReconciler.exe (self-contained, single file) for users.
+#   - Every push to main and every pull request: run the tests, publish the exe and attach it to the
+#     workflow run as the "GalaReconciler-win-x64" artifact (Actions tab → the run → Artifacts).
+#   - Pushing a tag like v1.2.0: also create a GitHub Release with a zip of the exe and the user guide.
+name: Console app
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # needed to create releases on tags
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # The web project (built by the tests) compiles its CSS with the Tailwind CLI.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: src/GalaReconciler.Web/package-lock.json
+
+      - name: Install npm packages
+        working-directory: src/GalaReconciler.Web
+        run: npm ci
+
+      - name: Test
+        run: dotnet test -c Release
+
+      - name: Work out the version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") { $v = "${{ github.ref_name }}".TrimStart("v") } else { $v = "1.0.0-ci.${{ github.run_number }}" }
+          "value=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Publish GalaReconciler.exe
+        run: dotnet publish src/GalaReconciler.Cli -p:PublishProfile=win-x64 -p:Version=${{ steps.version.outputs.value }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GalaReconciler-win-x64
+          path: artifacts/win-x64/
+
+      - name: Zip for the release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: Compress-Archive -Path artifacts/win-x64/* -DestinationPath GalaReconciler-${{ steps.version.outputs.value }}-win-x64.zip
+
+      - uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          files: GalaReconciler-${{ steps.version.outputs.value }}-win-x64.zip
+          generate_release_notes: true

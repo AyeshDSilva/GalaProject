@@ -7,7 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ClosedXML" Version="0.105.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.14">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -35,18 +34,16 @@
     <None Include="package.json;package-lock.json" />
   </ItemGroup>
 
-  <Target Name="ClientAssetsNpmInstall"
-          Condition="'$(SkipClientAssets)' != 'true' And '$(DesignTimeBuild)' != 'true' And (!Exists('node_modules/@tailwindcss/cli') Or !Exists('node_modules/@microsoft/signalr'))">
+  <ItemGroup>
+    <ProjectReference Include="..\GalaReconciler.Core\GalaReconciler.Core.csproj" />
+  </ItemGroup>
+
+  <Target Name="ClientAssetsNpmInstall" Condition="'$(SkipClientAssets)' != 'true' And '$(DesignTimeBuild)' != 'true' And (!Exists('node_modules/@tailwindcss/cli') Or !Exists('node_modules/@microsoft/signalr'))">
     <Message Importance="high" Text="Installing npm packages for client assets..." />
     <Exec Command="npm install" WorkingDirectory="$(MSBuildProjectDirectory)" />
   </Target>
 
-  <Target Name="ClientAssetsBuild"
-          BeforeTargets="BeforeBuild"
-          DependsOnTargets="ClientAssetsNpmInstall"
-          Condition="'$(SkipClientAssets)' != 'true' And '$(DesignTimeBuild)' != 'true'"
-          Inputs="@(ClientAssetSource)"
-          Outputs="$(TailwindOutput);$(SignalROutput)">
+  <Target Name="ClientAssetsBuild" BeforeTargets="BeforeBuild" DependsOnTargets="ClientAssetsNpmInstall" Condition="'$(SkipClientAssets)' != 'true' And '$(DesignTimeBuild)' != 'true'" Inputs="@(ClientAssetSource)" Outputs="$(TailwindOutput);$(SignalROutput)">
     <Exec Command="npm run build" WorkingDirectory="$(MSBuildProjectDirectory)" />
     <!-- On a clean checkout, add the freshly generated files so they're served and published. -->
     <ItemGroup Condition="'$(ClientAssetsExisted)' != 'true'">

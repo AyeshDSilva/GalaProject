@@ -1,9 +1,10 @@
 using System.Text.RegularExpressions;
-using GalaReconciler.Web.Features.Reconciliation;
-using GalaReconciler.Web.Features.Reconciliation.Matching;
-using GalaReconciler.Web.Features.Reconciliation.Parsing;
+using GalaReconciler.Core.Matching;
+using GalaReconciler.Core.Parsing;
+using GalaReconciler.Core.Rules;
+using GalaReconciler.Core;
 using GalaReconciler.Web.Features.Reconciliation.Persistence;
-using GalaReconciler.Web.Features.Reconciliation.Rules;
+using GalaReconciler.Web.Features.Reconciliation;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -70,7 +71,7 @@ public static partial class TestHandlers
         new ProcessedGuestListParser(),
         new GuestMatcher(),
         [
-            new DatesMismatchRule(Options.Create(new ReconciliationOptions())),
+            new DatesMismatchRule(Options.Create(new ComparisonOptions())),
             new MobileNumberMismatchRule(),
             new EmailMismatchRule(),
         ],

@@ -1,7 +1,7 @@
 using ClosedXML.Excel;
+using GalaReconciler.Core.Domain;
+using GalaReconciler.Core.Parsing;
 using GalaReconciler.Tests.Helpers;
-using GalaReconciler.Web.Features.Reconciliation.Domain;
-using GalaReconciler.Web.Features.Reconciliation.Parsing;
 
 namespace GalaReconciler.Tests.Parsing;
 

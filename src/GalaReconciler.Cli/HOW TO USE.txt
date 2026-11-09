@@ -1,0 +1,68 @@
+GALA Reconciler
+===============
+
+Compares the RSVP export from the ticketing system with the master guest list and saves the
+differences (attendance days, mobile numbers and emails) to an Excel file.
+
+
+How to use
+----------
+
+1. Put GalaReconciler.exe in the same folder as the two Excel files:
+     - the RSVP export (Source)
+     - the master guest list (Processed)
+   The files can have any names. The app works out which is which from their column headers.
+
+2. Double-click GalaReconciler.exe.
+
+3. A window shows which files were used and how many differences were found. The report is saved
+   in the same folder as:
+     GALA Reconciliation <date> <time>.xlsx
+
+4. Press any key to close the window.
+
+Nothing is sent anywhere: the files are read on this computer and only the report is written.
+
+
+The report
+----------
+
+Summary      File names, guest counts and the number of each type of difference.
+Differences  One row per difference. Use the filter arrows in the header row to show one type.
+             Day columns show Source → Processed: ✓ attending, ✗ not attending, – no response.
+             Highlighted days are the ones that differ.
+             Location gives the sheet and row numbers so you can find each person in the files.
+Warnings     Things that looked odd in the files, such as an unrecognised ticket type.
+
+Types of difference:
+  Guest not found   The person is only in one of the files.
+  Dates mismatch    Attending on a day in one file but not the other.
+  Mobile mismatch   The phone numbers differ.
+  Email mismatch    The email addresses differ.
+
+
+If something goes wrong
+-----------------------
+
+"Couldn't find the RSVP export" / "Couldn't find the master guest list"
+    Check both files are .xlsx (not .xls or .csv) and are in the same folder as the app.
+
+"Found more than one ..."
+    Move the files you don't want to compare out of the folder.
+
+"Couldn't save the report"
+    A report with that name is open in Excel. Close it and run the app again.
+
+Windows may show a "Windows protected your PC" message the first time. Click "More info", then
+"Run anyway".
+
+
+Running from a command prompt (optional)
+----------------------------------------
+
+  GalaReconciler                                   search the current folder
+  GalaReconciler source.xlsx processed.xlsx        use these two files
+  GalaReconciler --folder "C:\Gala\November"       search another folder
+  GalaReconciler --output "C:\Reports\gala.xlsx"   choose where to save the report
+  GalaReconciler --strict                          treat "not attending" and "no response" as different
+  GalaReconciler --help                            show all options

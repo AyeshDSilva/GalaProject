@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using GalaReconciler.Web.Features.Reconciliation.Domain;
+using GalaReconciler.Core.Domain;
+using GalaReconciler.Core;
 using Microsoft.EntityFrameworkCore;
 
 namespace GalaReconciler.Web.Features.Reconciliation.Persistence;

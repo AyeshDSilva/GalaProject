@@ -7,19 +7,82 @@ Compares the ticketing system's **RSVP export** (Source) with the hand-maintaine
 - mobile numbers
 - email addresses
 
-Each comparison is saved as a **run**. Uploading the files queues the run, a background worker compares
-them, and the run page updates itself over SignalR when the results are ready. The **Runs** page lists past
-runs and can filter them by guest name, file name, type of difference, status and date.
+It comes in two forms that share the same comparison code:
 
-Uploaded files are held in memory only (never written to disk) and are discarded once processed. Only the
-results are stored, in a local SQLite database.
+- **Console app (`GalaReconciler.exe`)**: put it in a folder with the two files and run it. It works out
+  which file is which and saves the differences as an Excel report next to them.
+- **Web app**: upload the two files in a browser. Each comparison runs in the background, is saved as a
+  run in a local SQLite database (results only), and the run page updates over SignalR. The Runs page lists
+  past runs with filters.
+
+Both read the uploaded workbooks in memory only and never store the input files.
 
 ## Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- [Node.js 20+](https://nodejs.org/) (used only to build the client assets)
+- [Node.js 20+](https://nodejs.org/) (only for the web app's client assets; the tests build the web app too)
 
-## Run
+People who only use the published `GalaReconciler.exe` need nothing installed.
+
+## Console app
+
+### For users
+
+Download `GalaReconciler-win-x64` from the latest run of the **Console app** workflow on GitHub
+(Actions tab → the run → Artifacts), or the zip on a release. It contains `GalaReconciler.exe` and
+`HOW TO USE.txt`.
+
+1. Put `GalaReconciler.exe` in the folder with the RSVP export and the master guest list (any file names).
+2. Double-click it.
+3. The report is saved in the same folder as `GALA Reconciliation <date> <time>.xlsx`, and the window
+   waits for a key press so the summary can be read.
+
+The report has three sheets:
+
+| Sheet | Contents |
+|---|---|
+| Summary | File names, guest counts and the number of each type of difference. |
+| Differences | One row per difference in a filterable Excel table: type, guest, host, details, both values, a day grid (Source → Processed, differing days highlighted) and the sheet/row location in each file. |
+| Warnings | Unrecognised ticket types, duplicate rows and other oddities found while reading. |
+
+How the files are found: every `.xlsx` in the folder is opened (except Excel's `~$` lock files and earlier
+`GALA Reconciliation…` reports). The one with `Ticket type` and `Order id` columns is the RSVP export, and the
+one whose first sheet has `Surname`, `Guest Name` and the day columns is the master list. If either is missing,
+or there's more than one candidate, the app says so instead of guessing.
+
+From a command prompt:
+
+```
+GalaReconciler [source.xlsx processed.xlsx] [--folder <folder>] [--output <file or folder>] [--strict] [--no-pause]
+```
+
+Exit codes: `0` report written, `1` a problem with the input files or arguments, `2` unexpected error.
+
+### Run it from source
+
+```bash
+dotnet run --project src/GalaReconciler.Cli -- --folder samples
+```
+
+### Publish the exe
+
+```bash
+dotnet publish src/GalaReconciler.Cli -p:PublishProfile=win-x64
+```
+
+This writes a self-contained, single-file `GalaReconciler.exe` (about 40 MB, no .NET install needed) and
+`HOW TO USE.txt` to `artifacts/win-x64/`.
+
+The GitHub Actions workflow `.github/workflows/console-app.yml` does this on every push to `main` and every
+pull request (after running the tests) and attaches the result to the run. Pushing a version tag such as
+`v1.2.0` also creates a GitHub Release with a zip of the exe, stamped with that version:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+## Web app
 
 ```bash
 dotnet run --project src/GalaReconciler.Web
@@ -41,19 +104,9 @@ cd src/GalaReconciler.Web
 npm run watch:css
 ```
 
-## Test
+### Configuration
 
-```bash
-dotnet test
-```
-
-Tests that start the web app use a throwaway SQLite file in the temp folder. The test run also writes
-`samples/Source.xlsx` and `samples/Processed.xlsx` (from
-`tests/GalaReconciler.Tests/Helpers/SampleWorkbookBuilder.cs`). Upload those two files to try the app.
-
-## Configuration
-
-`appsettings.json`:
+`src/GalaReconciler.Web/appsettings.json`:
 
 ```json
 "ConnectionStrings": {
@@ -69,15 +122,15 @@ Tests that start the web app use a throwaway SQLite file in the temp folder. The
 | Setting | Meaning |
 |---|---|
 | `ConnectionStrings:Reconciliation` | SQLite database for saved runs. A relative path is relative to the web project folder. |
-| `StrictNotAttending` | By default "not attending" and "no response" count as the same thing. `true` also flags days where one file says N and the other is blank. |
+| `StrictNotAttending` | By default "not attending" and "no response" count as the same thing. `true` also flags days where one file says N and the other is blank. (The console app's `--strict` flag does the same.) |
 | `RetentionDays` | Runs older than this are deleted automatically (checked at startup and every 6 hours). `0` keeps them forever. |
 | `MaxQueuedComparisons` | How many uploads can wait for the worker. Each holds both files in memory (up to ~20 MB), and further uploads get a "server is busy" message. |
 
-> **Personal data:** saved runs contain guests' names, phone numbers and emails, and the app has no login.
-> Anyone who can reach the app can see every saved run. Keep it on a trusted machine or network, or add
+> **Personal data:** saved runs contain guests' names, phone numbers and emails, and the web app has no
+> login. Anyone who can reach it can see every saved run. Keep it on a trusted machine or network, or add
 > authentication before hosting it more widely.
 
-## How it works
+### How it works
 
 ```
 Upload (POST /Reconciliation/Compare)
@@ -96,30 +149,7 @@ RSVP export). Runs that were still queued or processing when the app stopped are
 the next startup; their files were only in memory, so they need uploading again. If the browser can't
 connect to SignalR, the run page falls back to reloading itself every few seconds.
 
-```
-src/GalaReconciler.Web/
-  Features/Reconciliation/         one vertical slice: controller, view models, views and logic
-    ReconciliationController.cs    upload form, Compare, runs list, run page, delete
-    CompareFilesHandler.cs         parse → match → rules
-    Domain/                        EventDay (+ EventDays mapping), GuestRecord, Discrepancy, …
-    Parsing/                       SourceRsvpParser, ProcessedGuestListParser, HeaderMap, TicketTypeParser
-    Normalization/                 NameNormalizer, PhoneNormalizer, EmailNormalizer
-    Matching/                      GuestMatcher (name, then unique shared email; never phone)
-    Rules/                         IDiscrepancyRule + DatesMismatch, MobileNumberMismatch, EmailMismatch
-    Persistence/                   ReconciliationDbContext, Run entities, RunStore, Migrations/
-    Background/                    ComparisonQueue, ComparisonWorker, ComparisonProcessor, RunRetentionService
-    Realtime/                      ComparisonHub (SignalR) and the notifier the worker uses
-  Features/Error/                  friendly error page
-  Shared/Views/                    _Layout, Error
-  Shared/Infrastructure/           FeatureViewLocationExpander (Features/{Controller}/{View}.cshtml, then Shared/Views/)
-  Styles/app.css                   Tailwind v4 input
-```
-
-`_ViewImports.cshtml` and `_ViewStart.cshtml` sit at the project root rather than in `Shared/Views/`.
-Razor finds those two files by walking up the folders from each view, not through the view location
-expander, so they have to sit above both `Features/` and `Shared/`.
-
-## Changing the database schema
+### Changing the database schema
 
 After changing the entities in `Features/Reconciliation/Persistence/`, add a migration (the `dotnet-ef`
 tool is in the repository's tool manifest):
@@ -131,28 +161,73 @@ dotnet ef migrations add <Name> --project src/GalaReconciler.Web --output-dir Fe
 
 It's applied automatically the next time the app starts.
 
+## Test
+
+```bash
+dotnet test
+```
+
+Tests that start the web app use a throwaway SQLite file in the temp folder; console app tests use temp
+folders. The test run also writes `samples/Source.xlsx` and `samples/Processed.xlsx` (fictional data, from
+`tests/GalaReconciler.Tests/Helpers/SampleWorkbookBuilder.cs`) for trying either app.
+
+## Project layout
+
+```
+src/GalaReconciler.Core/           the comparison, shared by both apps
+  CompareFilesHandler.cs           parse → match → rules
+  ComparisonServiceCollectionExtensions.cs   registers parsers, matcher and rules (AddComparison)
+  Domain/                          EventDay (+ EventDays mapping), GuestRecord, Discrepancy, …
+  Parsing/                         SourceRsvpParser, ProcessedGuestListParser, HeaderMap, TicketTypeParser, WorkbookDetector
+  Normalization/                   NameNormalizer, PhoneNormalizer, EmailNormalizer
+  Matching/                        GuestMatcher (name, then unique shared email; never phone)
+  Rules/                           IDiscrepancyRule + DatesMismatch, MobileNumberMismatch, EmailMismatch
+
+src/GalaReconciler.Cli/            console app → GalaReconciler.exe
+  CliApp.cs                        find files → compare → save report
+  InputFileFinder.cs               picks the two workbooks out of a folder
+  ExcelReportWriter.cs             Summary / Differences / Warnings workbook
+  Properties/PublishProfiles/win-x64.pubxml   single-file publish settings
+
+src/GalaReconciler.Web/            web app
+  Features/Reconciliation/         one vertical slice: controller, view models, views
+    Persistence/                   ReconciliationDbContext, Run entities, RunStore, Migrations/
+    Background/                    ComparisonQueue, ComparisonWorker, ComparisonProcessor, RunRetentionService
+    Realtime/                      ComparisonHub (SignalR) and the notifier the worker uses
+  Features/Error/                  friendly error page
+  Shared/Views/                    _Layout, Error
+  Shared/Infrastructure/           FeatureViewLocationExpander (Features/{Controller}/{View}.cshtml, then Shared/Views/)
+  Styles/app.css                   Tailwind v4 input
+
+tests/GalaReconciler.Tests/        xUnit tests for all three projects
+```
+
+`_ViewImports.cshtml` and `_ViewStart.cshtml` sit at the web project root rather than in `Shared/Views/`.
+Razor finds those two files by walking up the folders from each view, not through the view location
+expander, so they have to sit above both `Features/` and `Shared/`.
+
 ## Adding a new rule
 
-1. Create a class in `Features/Reconciliation/Rules/` that implements `IDiscrepancyRule`. For a
+1. Create a class in `src/GalaReconciler.Core/Rules/` that implements `IDiscrepancyRule`. For a
    set-of-values comparison like phones or emails, derive from `SetMismatchRule` instead.
 2. Add a value to `DiscrepancyType` (and its label in `DiscrepancyTypeExtensions.ToDisplay`).
-3. Register it in `ReconciliationServiceCollectionExtensions.AddReconciliation`:
+3. Register it in `ComparisonServiceCollectionExtensions.AddComparison` (both apps pick it up):
    ```csharp
    services.AddSingleton<IDiscrepancyRule, MyNewRule>();
    ```
    Rules run in registration order.
-4. Give the new type colours in `Results.cshtml` (`BadgeClasses`, `DotClasses`, `CardDescription`) and
-   `Runs.cshtml` (`CountClasses`).
-5. Saved runs keep a count per type for the runs list: add a `…Count` column to `Run` (set it in
+4. Give the new type colours in the web views (`Results.cshtml`: `BadgeClasses`, `DotClasses`,
+   `CardDescription`; `Runs.cshtml`: `CountClasses`) and in `ExcelReportWriter.StyleType`.
+5. Saved web runs keep a count per type for the runs list: add a `…Count` column to `Run` (set it in
    `RunStore.CompleteAsync`, and add it to `Run.CountOf` and the `Type` filter in `RunStore.ListAsync`),
    then add a migration.
 
 ## Adding a new event day
 
-1. Add a value to the `EventDay` enum in `Features/Reconciliation/Domain/EventDay.cs`.
+1. Add a value to the `EventDay` enum in `src/GalaReconciler.Core/Domain/EventDay.cs`.
 2. Add one entry to `EventDays.All` in the same file, giving the ticket type prefix (e.g. `"Monday"` for
    `"Monday attending"`), the Processed column header (e.g. `"MON"`) and a short label for the day grid.
 
-The ticket type parser, the Processed parser (including its required headers), the dates rule and the
-results day grid all read from that list. Saved runs store each difference's days as JSON, so no
-migration is needed.
+The ticket type parser, the Processed parser (including its required headers), the dates rule, the web
+day grid and the report's day columns all read from that list. Saved runs store each difference's days as
+JSON, so no migration is needed.

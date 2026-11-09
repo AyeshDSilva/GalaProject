@@ -1,6 +1,6 @@
-using GalaReconciler.Web.Features.Reconciliation;
-using GalaReconciler.Web.Features.Reconciliation.Domain;
-using GalaReconciler.Web.Features.Reconciliation.Rules;
+using GalaReconciler.Core.Domain;
+using GalaReconciler.Core.Rules;
+using GalaReconciler.Core;
 using Microsoft.Extensions.Options;
 using static GalaReconciler.Tests.Helpers.TestGuests;
 
@@ -9,7 +9,7 @@ namespace GalaReconciler.Tests.Rules;
 public class DatesMismatchRuleTests
 {
     private static DatesMismatchRule Rule(bool strict = false) =>
-        new(Options.Create(new ReconciliationOptions { StrictNotAttending = strict }));
+        new(Options.Create(new ComparisonOptions { StrictNotAttending = strict }));
 
     [Fact]
     public void No_discrepancy_when_days_agree()

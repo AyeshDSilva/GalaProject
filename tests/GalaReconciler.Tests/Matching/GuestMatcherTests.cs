@@ -1,4 +1,4 @@
-using GalaReconciler.Web.Features.Reconciliation.Matching;
+using GalaReconciler.Core.Matching;
 using static GalaReconciler.Tests.Helpers.TestGuests;
 
 namespace GalaReconciler.Tests.Matching;

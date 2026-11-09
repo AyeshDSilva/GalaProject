@@ -1,4 +1,5 @@
-using GalaReconciler.Web.Features.Reconciliation.Parsing;
+using GalaReconciler.Core.Parsing;
+using GalaReconciler.Core;
 using GalaReconciler.Web.Features.Reconciliation.Persistence;
 using GalaReconciler.Web.Features.Reconciliation.Realtime;
 

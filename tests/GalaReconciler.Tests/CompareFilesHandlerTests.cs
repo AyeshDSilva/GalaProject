@@ -1,7 +1,8 @@
+using GalaReconciler.Core.Domain;
+using GalaReconciler.Core.Matching;
+using GalaReconciler.Core;
 using GalaReconciler.Tests.Helpers;
 using GalaReconciler.Web.Features.Reconciliation;
-using GalaReconciler.Web.Features.Reconciliation.Domain;
-using GalaReconciler.Web.Features.Reconciliation.Matching;
 
 namespace GalaReconciler.Tests;
 

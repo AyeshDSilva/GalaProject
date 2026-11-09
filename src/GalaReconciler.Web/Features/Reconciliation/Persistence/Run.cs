@@ -1,5 +1,5 @@
-using GalaReconciler.Web.Features.Reconciliation.Domain;
-using GalaReconciler.Web.Features.Reconciliation.Matching;
+using GalaReconciler.Core.Domain;
+using GalaReconciler.Core.Matching;
 
 namespace GalaReconciler.Web.Features.Reconciliation.Persistence;
 
