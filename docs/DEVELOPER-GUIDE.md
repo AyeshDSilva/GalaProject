@@ -171,7 +171,7 @@ All cleaning is in `src/GalaReconciler.Core/Normalization/`. Test cases are in
 
 | Class | What it does | Common changes |
 |---|---|---|
-| `TextNormalizer` | Title, post nominal, position. `Clean` turns blanks and placeholders into "no value". `ComparisonKey` ignores case, full stops and spaces. | Add a word to `Placeholders` (e.g. `"-"` is already covered, `"pending"` isn't). |
+| `TextNormalizer` | Title, post nominal, position. `Clean` turns blanks and placeholders into "no value". `ComparisonKey` ignores case, full stops and spaces. | Add a word to `Placeholders` (e.g. `"-"` is already covered, `"pending"` isn't). Treat two titles as the same in `TitleMismatchRule.ComparisonKey` (Miss = Ms is there). |
 | `PhoneNormalizer` | Keeps digits only, turns `+61` into `0`, puts back a leading `0` that Excel dropped, splits cells on `/ , ; \|` and "or". | Support another country prefix; add a separator to `Separators()`. |
 | `EmailNormalizer` | Lower-cases and splits cells holding several addresses. | |
 | `NameNormalizer` | Builds the match key from first + last name, stripping leading titles (`Titles`: mr, mrs, ms, miss, dr, prof, sir, dame). | Add a title to `Titles` (lower case, e.g. `"hon"`) so "Hon Jane Smith" matches "Jane Smith". |

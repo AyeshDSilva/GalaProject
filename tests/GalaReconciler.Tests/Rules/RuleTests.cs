@@ -96,6 +96,10 @@ public class TextMismatchRuleTests
     [InlineData("Dr", "Ms", true)]
     [InlineData("Mr.", "Mr", false)]   // full stops and case don't count
     [InlineData("MR", "mr", false)]
+    [InlineData("Miss", "Ms", false)]  // used interchangeably
+    [InlineData("Ms.", "Miss", false)]
+    [InlineData("Mrs", "Ms", true)]
+    [InlineData("Mrs", "Miss", true)]
     [InlineData("Dr", null, true)]     // missing in the master list
     [InlineData(null, "Ms", false)]    // blank in the export: leave it
     [InlineData("nil", "Ms", false)]

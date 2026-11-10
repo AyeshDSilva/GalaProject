@@ -75,7 +75,7 @@ The **results workbook** has three sheets:
 
 For title, post nominal and position, a blank or `nil` value in the export never raises anything (the
 master list is left as it is), and case, full stops and spacing are ignored (`Mr.` = `Mr`, `O.A.M.` = `OAM`).
-A drop-down value of "Other" with nothing specified counts as blank.
+A drop-down value of "Other" with nothing specified counts as blank. The titles Miss and Ms count as the same.
 
 How the files are found: every `.xlsx` in the folder is opened (except Excel's `~$` lock files and earlier
 `GALA Reconciliation…` reports). The one with `Ticket type` and `Order id` columns is the RSVP export, and the

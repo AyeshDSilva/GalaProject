@@ -18,6 +18,9 @@ public abstract class TextMismatchRule : IDiscrepancyRule
     /// <summary>Lets a rule skip pairs where the field means something else.</summary>
     protected virtual bool ShouldCompare(MatchedPair pair) => true;
 
+    /// <summary>Values with the same key count as the same.</summary>
+    protected virtual string ComparisonKey(string value) => TextNormalizer.ComparisonKey(value);
+
     public Discrepancy? Evaluate(MatchedPair pair)
     {
         var source = TextNormalizer.Clean(SelectValue(pair.Source));
@@ -27,7 +30,7 @@ public abstract class TextMismatchRule : IDiscrepancyRule
         }
 
         var processed = TextNormalizer.Clean(SelectValue(pair.Processed));
-        if (processed is not null && TextNormalizer.ComparisonKey(source) == TextNormalizer.ComparisonKey(processed))
+        if (processed is not null && ComparisonKey(source) == ComparisonKey(processed))
         {
             return null;
         }
@@ -49,6 +52,13 @@ public sealed class TitleMismatchRule : TextMismatchRule
     public override DiscrepancyType Type => DiscrepancyType.TitleMismatch;
 
     protected override string? SelectValue(GuestRecord record) => record.Title;
+
+    /// <summary>"Miss" and "Ms" are used interchangeably, so they count as the same title.</summary>
+    protected override string ComparisonKey(string value)
+    {
+        var key = base.ComparisonKey(value);
+        return key == "miss" ? "ms" : key;
+    }
 }
 
 /// <summary>Post nominal: "Please specify your post nominal" wins over Post nominal; compared with Postnom.</summary>

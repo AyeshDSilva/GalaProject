@@ -63,7 +63,8 @@ Email      One address in common is enough: if the RSVP export's email is in eit
            Email 2, it is not highlighted.
 
 For title, post nominal and position: if the RSVP export is blank or says "nil", the master list is
-left alone. Capitals, full stops and spacing don't count ("Mr." is the same as "Mr").
+left alone. Capitals, full stops and spacing don't count ("Mr." is the same as "Mr"), and the titles
+Miss and Ms count as the same.
 
 
 The results workbook
