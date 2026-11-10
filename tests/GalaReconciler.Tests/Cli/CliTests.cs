@@ -153,7 +153,8 @@ public sealed class ExcelReportWriterTests : IDisposable
         Assert.Equal("Source.xlsx", ValueFor("Source file"));
         Assert.Equal("12", ValueFor("Matched"));
         Assert.Equal("4", ValueFor("Guest not found"));
-        Assert.Equal("13", ValueFor("Total"));
+        Assert.Equal("12", ValueFor("Total"));
+        Assert.Equal("1", ValueFor("Mobile mismatch"));
         Assert.Equal("1", ValueFor("Position mismatch"));
         Assert.Equal("1", ValueFor("Warnings"));
     }
@@ -166,7 +167,7 @@ public sealed class ExcelReportWriterTests : IDisposable
 
         var table = sheet.Tables.Single();
         Assert.True(table.ShowAutoFilter);
-        Assert.Equal(13, table.DataRange.RowCount());
+        Assert.Equal(12, table.DataRange.RowCount());
         Assert.Equal(
             ["Type", "Guest", "Name in Source", "Guest of", "Details", "Possible match", "Matched by", "Source", "Processed",
              "Thu", "Fri", "Sat", "Sun", "Gala", "Source location", "Processed location"],
@@ -175,12 +176,13 @@ public sealed class ExcelReportWriterTests : IDisposable
         IXLTableRow Row(string guest, string type) =>
             table.DataRange.Rows().Single(r => r.Field("Guest").GetString() == guest && r.Field("Type").GetString() == type);
 
-        // Marco's two numbers, with the location of his four Source rows.
-        var marco = Row("Marco Bellini", "Mobile mismatch");
-        Assert.Equal("Only in Source: 049157156", marco.Field("Details").GetString());
-        Assert.Equal("Thurs_Sun Suite RSVP · rows 2, 4, 6, 8 · Order Q7RT2MXA", marco.Field("Source location").GetString());
-        Assert.Equal("Sheet1 · row 2", marco.Field("Processed location").GetString());
-        Assert.Equal("", marco.Field("Gala").GetString());
+        // William's numbers, with the location of his two Source rows.
+        var william = Row("William Hartley", "Mobile mismatch");
+        Assert.Equal("Nothing in common", william.Field("Details").GetString());
+        Assert.Equal("0491576398\n0491576801", william.Field("Processed").GetString().ReplaceLineEndings("\n"));
+        Assert.Equal("Thurs_Sun Suite RSVP · rows 17, 18 · Order BH77KWER", william.Field("Source location").GetString());
+        Assert.Equal("Sheet1 · row 14", william.Field("Processed location").GetString());
+        Assert.Equal("", william.Field("Gala").GetString());
 
         // Clara is attending but still marked 1 (invited, no response) for the Gala: that day differs and is highlighted.
         var clara = Row("Clara Walsh", "Dates mismatch");
@@ -243,11 +245,11 @@ public sealed class CliAppTests : IDisposable
         Assert.Contains("Source file:    RSVP export.xlsx", text);
         Assert.Contains("Processed file: Master list.xlsx", text);
         Assert.Contains(
-            "13 differences: 4 guest not found, 2 dates mismatch, 2 mobile mismatch, 2 email mismatch, 1 title mismatch, 1 post nominal mismatch, 1 position mismatch",
+            "12 differences: 4 guest not found, 2 dates mismatch, 1 mobile mismatch, 2 email mismatch, 1 title mismatch, 1 post nominal mismatch, 1 position mismatch",
             text);
         Assert.Contains("Results saved:", text);
         Assert.Contains("Highlighted master list:", text);
-        Assert.Contains("(13 cells highlighted; the original files were not changed)", text);
+        Assert.Contains("(12 cells highlighted; the original files were not changed)", text);
     }
 
     [Fact]
@@ -340,13 +342,14 @@ public sealed class ProcessedFileHighlighterTests : IDisposable
         var sheet = workbook.Worksheet(1);
         var yellow = ProcessedFileHighlighter.ChangedFill;
 
-        // Rows: 2 Marco, 3 Leilani, 5 Olivia, 7 Ethan, 10 Maeve, 11 Henry, 12 Clara, 14 William, 15 Ruby McIntyre.
-        Assert.Equal(13, count);
+        // Rows: 3 Leilani, 5 Olivia, 7 Ethan, 10 Maeve, 11 Henry, 12 Clara, 14 William, 15 Ruby McIntyre.
+        Assert.Equal(12, count);
 
-        var marcoPhone = Cell(sheet, 2, "Phone");
-        Assert.Equal(yellow, marcoPhone.Style.Fill.BackgroundColor);
-        Assert.Contains("RSVP export: 0491570156, 049157156", marcoPhone.GetComment().Text);
-        Assert.Contains("This list: 0491570156", marcoPhone.GetComment().Text);
+        // William's Phone cell has two numbers on separate lines and neither is in the export.
+        var williamPhone = Cell(sheet, 14, "Phone");
+        Assert.Equal(yellow, williamPhone.Style.Fill.BackgroundColor);
+        Assert.Contains("RSVP export: 0491574632", williamPhone.GetComment().Text);
+        Assert.Contains("This list: 0491576398, 0491576801", williamPhone.GetComment().Text);
 
         Assert.Equal(yellow, Cell(sheet, 3, "Prenom").Style.Fill.BackgroundColor);
         Assert.Contains("RSVP export: Dr", Cell(sheet, 3, "Prenom").GetComment().Text);
@@ -378,6 +381,13 @@ public sealed class ProcessedFileHighlighterTests : IDisposable
         Assert.False(Cell(sheet, 4, "Prenom").HasComment);    // Alice: "Ms." = "Ms"
         Assert.False(Cell(sheet, 7, "Grid Gala").HasComment); // Ethan: 1 and no ticket agree
         Assert.False(Cell(sheet, 4, "First Name").HasComment);
+
+        // One matching phone or email is enough.
+        Assert.False(Cell(sheet, 2, "Phone").HasComment);     // Marco: one of his export numbers has a typo
+        Assert.False(Cell(sheet, 3, "Phone").HasComment);     // Leilani: one of her two export numbers matches
+        Assert.False(Cell(sheet, 4, "Phone").HasComment);     // Alice: one of the two numbers in the cell matches
+        Assert.False(Cell(sheet, 8, "Email 1").HasComment);   // Luca: his export email is in Email 2
+        Assert.False(Cell(sheet, 8, "Email 2").HasComment);
 
         // Everything else in the list is kept, including hidden columns and other data.
         Assert.True(sheet.Column(2).IsHidden);

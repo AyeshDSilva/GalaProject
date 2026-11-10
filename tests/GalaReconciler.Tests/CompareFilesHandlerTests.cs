@@ -17,29 +17,42 @@ public class CompareFilesHandlerTests
     private static DiscrepancyType[] TypesFor(string guest) => For(guest).Select(d => d.Type).ToArray();
 
     [Fact]
-    public void Marco_has_only_a_mobile_mismatch()
+    public void Marco_has_no_discrepancies_because_one_of_his_numbers_matches()
     {
-        var discrepancy = Assert.Single(For("Marco Bellini"));
-        Assert.Equal(DiscrepancyType.MobileNumberMismatch, discrepancy.Type);
-        Assert.Equal("Only in Source: 049157156", discrepancy.Detail);
-        Assert.Equal([2, 4, 6, 8], discrepancy.SourceRows.Select(r => r.RowNumber));
-        Assert.All(discrepancy.SourceRows, r => Assert.Equal(SampleWorkbookBuilder.SuiteSheet, r.SheetName));
-        Assert.Equal(new RowReference(SampleWorkbookBuilder.ProcessedSheetName, 2), Assert.Single(discrepancy.ProcessedRows));
+        // His export rows have 0491570156 and a typo, 049157156; the master list has 0491570156.
+        Assert.Empty(For("Marco Bellini"));
     }
 
     [Fact]
-    public void Leilani_has_a_mobile_and_a_title_mismatch_but_her_guest_of_position_is_skipped()
+    public void Leilani_has_only_a_title_mismatch()
     {
-        Assert.Equal([DiscrepancyType.MobileNumberMismatch, DiscrepancyType.TitleMismatch], TypesFor("Leilani Fonua"));
-
-        var mobile = For("Leilani Fonua").Single(d => d.Type == DiscrepancyType.MobileNumberMismatch);
-        Assert.Equal("Only in Source: 0491570158", mobile.Detail);
-        Assert.Equal("Marco Bellini", mobile.HostDisplayName);
+        // Her second number isn't in the master list, but her first is; her "Guest of" position is skipped.
+        var title = Assert.Single(For("Leilani Fonua"));
+        Assert.Equal(DiscrepancyType.TitleMismatch, title.Type);
+        Assert.Equal("Marco Bellini", title.HostDisplayName);
 
         // "Please specify your title" (Dr) wins over Title (Other).
-        var title = For("Leilani Fonua").Single(d => d.Type == DiscrepancyType.TitleMismatch);
         Assert.Equal("Dr", title.SourceValue);
         Assert.Equal("Ms", title.ProcessedValue);
+    }
+
+    [Fact]
+    public void William_has_no_number_in_common_with_his_two_line_phone_cell()
+    {
+        var mobile = For("William Hartley").Single(d => d.Type == DiscrepancyType.MobileNumberMismatch);
+        Assert.Equal("Nothing in common", mobile.Detail);
+        Assert.Equal("0491574632", mobile.SourceValue);
+        Assert.Equal("0491576398\n0491576801", mobile.ProcessedValue);
+        Assert.Equal([17, 18], mobile.SourceRows.Select(r => r.RowNumber));
+        Assert.All(mobile.SourceRows, r => Assert.Equal(SampleWorkbookBuilder.SuiteSheet, r.SheetName));
+        Assert.Equal(new RowReference(SampleWorkbookBuilder.ProcessedSheetName, 14), Assert.Single(mobile.ProcessedRows));
+    }
+
+    [Fact]
+    public void One_matching_value_is_enough_for_phones_and_emails()
+    {
+        Assert.Empty(For("Alice Romano"));  // two numbers in her Phone cell, one matches
+        Assert.Empty(For("Luca Di Marco")); // his export email is in Email 2, not Email 1
     }
 
     [Fact]
@@ -124,8 +137,9 @@ public class CompareFilesHandlerTests
     [Fact]
     public void Bill_matches_William_by_email_and_saturday_differs()
     {
-        var discrepancy = Assert.Single(For("William Hartley"));
-        Assert.Equal(DiscrepancyType.DatesMismatch, discrepancy.Type);
+        Assert.Equal([DiscrepancyType.DatesMismatch, DiscrepancyType.MobileNumberMismatch], TypesFor("William Hartley"));
+
+        var discrepancy = For("William Hartley").Single(d => d.Type == DiscrepancyType.DatesMismatch);
         Assert.Equal(MatchMethod.Email, discrepancy.MatchedBy);
         Assert.Equal("Bill Hartley", discrepancy.SourceDisplayName);
         Assert.Equal([EventDay.Saturday], discrepancy.AffectedDays);
@@ -149,18 +163,17 @@ public class CompareFilesHandlerTests
     [Fact]
     public void Totals_and_ordering()
     {
-        Assert.Equal(13, Result.Discrepancies.Count);
+        Assert.Equal(12, Result.Discrepancies.Count);
         Assert.Equal(14, Result.SourceGuestCount);
         Assert.Equal(14, Result.ProcessedGuestCount);
         Assert.Equal(12, Result.MatchedCount);
 
-        // Ordered by name, with each guest grouped under their host (Clara after Henry, Leilani after Marco,
-        // Maeve where Oscar Reid would be), then by type.
+        // Ordered by name, with each guest grouped under their host (Clara after Henry, Leilani where Marco
+        // would be, Maeve where Oscar Reid would be), then by type.
         Assert.Equal(
             [
-                "Ethan Cole", "Henry Walsh", "Clara Walsh", "Marco Bellini", "Leilani Fonua", "Leilani Fonua",
-                "Olivia Grant-Taylor", "Olivia Grant-Taylor", "Maeve O'Connell", "Ruby Macintyre", "Ruby McIntyre",
-                "Sam Fletcher", "William Hartley",
+                "Ethan Cole", "Henry Walsh", "Clara Walsh", "Leilani Fonua", "Olivia Grant-Taylor", "Olivia Grant-Taylor",
+                "Maeve O'Connell", "Ruby Macintyre", "Ruby McIntyre", "Sam Fletcher", "William Hartley", "William Hartley",
             ],
             Result.Discrepancies.Select(d => d.GuestDisplayName));
     }

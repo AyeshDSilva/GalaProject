@@ -14,7 +14,8 @@ public static class SampleWorkbookBuilder
         .AddSourceSheet(
             SuiteSheet,
             // Marco (rows 2, 4, 6, 8) and his guest Leilani (rows 3, 5, 7, 9) on one order, interleaved.
-            // Marco's Friday number is a numeric cell (leading zero lost); his Sunday number has a typo.
+            // Marco's Friday number is a numeric cell (leading zero lost); his Sunday number has a typo, but his
+            // other number matches the master list, so his phone isn't flagged. Same for Leilani's second number.
             Marco("Thursday attending", "0491570156"),
             Leilani("Thursday attending", "0491570157"),
             Marco("Friday attending", 491570156),
@@ -106,9 +107,9 @@ public static class SampleWorkbookBuilder
                 Prenom = "Ms", Thurs = "Y", Fri = "Y", Sat = "Y", Sun = "Y", Position = "Guest of Mr Marco Bellini",
                 Phone = "0491 570 157", Email1 = "leilani.fonua@example.com",
             },
-            new ProcessedGuest("Alice", "Romano") // row 4
+            new ProcessedGuest("Alice", "Romano") // row 4: two numbers in Phone; one matches, so no difference
             {
-                Prenom = "Ms", Sat = "Y", Phone = "0491 570 159", Email1 = "alice.romano@example.com", Dietary = "Vegetarian",
+                Prenom = "Ms", Sat = "Y", Phone = "0491 570 159\n08 7010 0999", Email1 = "alice.romano@example.com", Dietary = "Vegetarian",
             },
             new ProcessedGuest("Olivia", "Grant-Taylor") // row 5: phone is a numeric cell; post nominal AM vs OAM in the export
             {
@@ -119,9 +120,10 @@ public static class SampleWorkbookBuilder
             {
                 Prenom = "Mr", Sat = "N", GridGala = 1, Organisation = "Northwind Capital", Email1 = "ethan.cole@example.net",
             },
-            new ProcessedGuest("Luca", "Di Marco") // row 8: unnamed guest
+            new ProcessedGuest("Luca", "Di Marco") // row 8: unnamed guest; his export email is in Email 2, which is enough
             {
-                Prenom = "Mr", Sun = "N", GuestName = "guest", Phone = "0491574118", Email1 = "luca.dimarco@example.com",
+                Prenom = "Mr", Sun = "N", GuestName = "guest", Phone = "0491574118", Email1 = "luca@dimarco.example.org",
+                Email2 = "luca.dimarco@example.com",
             },
             new ProcessedGuest("Oscar", "Reid") // row 9: curly apostrophe in Guest Name; position kept (export says "nil")
             {
@@ -146,9 +148,9 @@ public static class SampleWorkbookBuilder
             {
                 Prenom = "Mr", GridGala = "Y", Position = "Guest of Mr Henry Walsh", Phone = "0491 571 266", Email1 = "nil",
             },
-            new ProcessedGuest("William", "Hartley") // row 14
+            new ProcessedGuest("William", "Hartley") // row 14: two numbers in Phone, neither matches the export
             {
-                Prenom = "Mr", Fri = "Y", Sat = "N", Phone = "0491 574 632", Email1 = "bill.hartley@example.com",
+                Prenom = "Mr", Fri = "Y", Sat = "N", Phone = "0491 576 398\n0491 576 801", Email1 = "bill.hartley@example.com",
             },
             new ProcessedGuest("Ruby", "McIntyre") // row 15
             {

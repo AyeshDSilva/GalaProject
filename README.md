@@ -70,8 +70,8 @@ The **results workbook** has three sheets:
 | Title | "Please specify your title", else Title | Prenom | different |
 | Post nominal | "Please specify your post nominal", else Post nominal | Postnom | different |
 | Position | Position title | Position (rows saying "Guest of …" are skipped) | different |
-| Mobile | Mobile + Telephone (all of a person's rows) | Phone | any number only on one side |
-| Email | Email | Email 1 + Email 2 | any address only on one side |
+| Mobile | Mobile + Telephone (all of a person's rows) | Phone (several numbers on separate lines are fine) | no number in common (one match is enough) |
+| Email | Email | Email 1 + Email 2 | no address in common (the address in either column is enough) |
 
 For title, post nominal and position, a blank or `nil` value in the export never raises anything (the
 master list is left as it is), and case, full stops and spacing are ignored (`Mr.` = `Mr`, `O.A.M.` = `OAM`).

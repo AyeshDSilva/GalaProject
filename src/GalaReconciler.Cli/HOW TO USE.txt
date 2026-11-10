@@ -55,8 +55,11 @@ Days       Each day column in the master list means:
 Title      "Please specify your title" wins over Title. Compared with Prenom.
 Post nominal  "Please specify your post nominal" wins over Post nominal. Compared with Postnom.
 Position   Position title, compared with Position. Rows whose Position says "Guest of ..." are skipped.
-Phone      All numbers for the person, ignoring spaces and +61.
-Email      Email 1 and Email 2.
+Phone      One number in common is enough. The Phone cell can hold several numbers (one per line):
+           if any of them matches a number in the RSVP export, it is not highlighted. Spaces and +61
+           are ignored.
+Email      One address in common is enough: if the RSVP export's email is in either Email 1 or
+           Email 2, it is not highlighted.
 
 For title, post nominal and position: if the RSVP export is blank or says "nil", the master list is
 left alone. Capitals, full stops and spacing don't count ("Mr." is the same as "Mr").

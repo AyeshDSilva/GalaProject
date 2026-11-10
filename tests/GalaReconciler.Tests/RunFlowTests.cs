@@ -22,11 +22,11 @@ public class RunFlowTests(GalaWebApplicationFactory factory) : IClassFixture<Gal
 
         var html = await TestHandlers.WaitForRunAsync(client, runUrl);
         Assert.Contains("Reconciliation results", html);
-        Assert.Contains("Marco Bellini", html);
+        Assert.Contains("William Hartley", html);
         Assert.Contains("matched by email", html);
 
         Assert.Contains(runUrl, await client.GetStringAsync("/runs"));
-        Assert.Contains(runUrl, await client.GetStringAsync("/runs?Guest=marco&Type=MobileNumberMismatch"));
+        Assert.Contains(runUrl, await client.GetStringAsync("/runs?Guest=william&Type=MobileNumberMismatch"));
         Assert.DoesNotContain(runUrl, await client.GetStringAsync("/runs?Guest=nobody-with-this-name"));
     }
 

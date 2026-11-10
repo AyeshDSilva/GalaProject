@@ -207,7 +207,8 @@ Then add a case to `ProcessedGuestListParserTests` and update the README table.
 
 Both files have an `Organisation` column that isn't compared yet. Here's the full path to compare it. Copy this
 pattern for any other single-text field. For a field holding several values (like phones), derive the rule from
-`SetMismatchRule` instead of `TextMismatchRule`.
+`SetMismatchRule` instead of `TextMismatchRule`: it passes when the two sides share at least one value (so a
+second phone number or the address in Email 2 is enough) and flags "Nothing in common" otherwise.
 
 **a. Hold the value on the guest.** In [GuestRecord.cs](../src/GalaReconciler.Core/Domain/GuestRecord.cs):
 ```csharp

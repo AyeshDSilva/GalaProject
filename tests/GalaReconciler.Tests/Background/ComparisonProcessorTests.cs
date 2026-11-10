@@ -32,7 +32,7 @@ public sealed class ComparisonProcessorTests : IDisposable
         var run = await ProcessAsync(SampleWorkbookBuilder.Source(), SampleWorkbookBuilder.Processed());
 
         Assert.Equal(RunStatus.Completed, run.Status);
-        Assert.Equal(13, run.Discrepancies.Count);
+        Assert.Equal(12, run.Discrepancies.Count);
         Assert.Equal([(run.Id, RunStatus.Processing), (run.Id, RunStatus.Completed)], _notifier.Calls);
     }
 

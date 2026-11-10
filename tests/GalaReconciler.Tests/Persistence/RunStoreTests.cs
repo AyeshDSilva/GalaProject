@@ -46,8 +46,8 @@ public sealed class RunStoreTests : IDisposable
         Assert.Equal(1, run.TitleMismatchCount);
         Assert.Equal(1, run.PostNominalMismatchCount);
         Assert.Equal(1, run.PositionMismatchCount);
-        Assert.Equal(13, run.DiscrepancyCount);
-        Assert.Equal(2, run.MobileNumberMismatchCount);
+        Assert.Equal(12, run.DiscrepancyCount);
+        Assert.Equal(1, run.MobileNumberMismatchCount);
         Assert.Equal(2, run.EmailMismatchCount);
         Assert.Equal(1, run.WarningCount);
 
@@ -98,7 +98,7 @@ public sealed class RunStoreTests : IDisposable
         Assert.Equal([completed], await List(new RunFilter { Status = RunStatus.Completed }));
         Assert.Equal([queued], await List(new RunFilter { Status = RunStatus.Queued }));
         Assert.Equal([completed], await List(new RunFilter { Type = DiscrepancyType.EmailMismatch }));
-        Assert.Equal([completed], await List(new RunFilter { Guest = "MARCO" }));
+        Assert.Equal([completed], await List(new RunFilter { Guest = "LEILANI" }));
         Assert.Equal([completed], await List(new RunFilter { Guest = "Bill Hartley" })); // Source spelling
         Assert.Equal([completed], await List(new RunFilter { Guest = "oscar reid" }));    // host of Maeve
         Assert.Empty(await List(new RunFilter { Guest = "Alice" }));                      // matched, no differences

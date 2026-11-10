@@ -4,8 +4,10 @@ using GalaReconciler.Core.Matching;
 namespace GalaReconciler.Core.Rules;
 
 /// <summary>
-/// Shared logic for comparing a set of normalized values (phones, emails): raise when either side has a
-/// value the other doesn't, or when one side is blank and the other isn't.
+/// Shared logic for comparing a set of normalized values (phones, emails). One value in common is enough:
+/// the master list often holds two numbers in one Phone cell, or the address in either Email 1 or Email 2,
+/// and only one of them needs to match. Raised when there's nothing in common, or when one side is blank and
+/// the other isn't.
 /// </summary>
 public abstract class SetMismatchRule : IDiscrepancyRule
 {
@@ -31,27 +33,13 @@ public abstract class SetMismatchRule : IDiscrepancyRule
         {
             detail = "Missing in Processed";
         }
+        else if (source.Overlaps(processed))
+        {
+            return null;
+        }
         else
         {
-            var onlyInSource = source.Except(processed).Order(StringComparer.Ordinal).ToList();
-            var onlyInProcessed = processed.Except(source).Order(StringComparer.Ordinal).ToList();
-            if (onlyInSource.Count == 0 && onlyInProcessed.Count == 0)
-            {
-                return null;
-            }
-
-            var parts = new List<string>();
-            if (onlyInSource.Count > 0)
-            {
-                parts.Add($"Only in Source: {string.Join(", ", onlyInSource)}");
-            }
-
-            if (onlyInProcessed.Count > 0)
-            {
-                parts.Add($"Only in Processed: {string.Join(", ", onlyInProcessed)}");
-            }
-
-            detail = string.Join("; ", parts);
+            detail = "Nothing in common";
         }
 
         return DiscrepancyFactory.ForPair(pair, Type, detail) with

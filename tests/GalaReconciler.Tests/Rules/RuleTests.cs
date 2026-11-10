@@ -155,26 +155,27 @@ public class MobileNumberMismatchRuleTests
     public void No_discrepancy_when_both_are_blank() => Assert.Null(_rule.Evaluate(Pair(Guest("A"), Guest("A"))));
 
     [Fact]
-    public void Flags_a_value_only_in_source_and_shows_all_values()
+    public void One_number_in_common_is_enough()
     {
-        var source = Guest("A").WithPhones("0491570156", "049157156");
-        var processed = Guest("A").WithPhones("0491570156");
+        // Two numbers entered on separate lines of one Phone cell; one is right.
+        Assert.Null(_rule.Evaluate(Pair(Guest("A").WithPhones("0491570156"), Guest("A").WithPhones("0491570156", "0870100999"))));
 
-        var discrepancy = _rule.Evaluate(Pair(source, processed));
-
-        Assert.NotNull(discrepancy);
-        Assert.Equal(DiscrepancyType.MobileNumberMismatch, discrepancy.Type);
-        Assert.Equal("Only in Source: 049157156", discrepancy.Detail);
-        Assert.Equal("0491570156\n049157156", discrepancy.SourceValue);
-        Assert.Equal("0491570156", discrepancy.ProcessedValue);
+        // A typo on one export row doesn't matter while another row's number matches.
+        Assert.Null(_rule.Evaluate(Pair(Guest("A").WithPhones("0491570156", "049157156"), Guest("A").WithPhones("0491570156"))));
     }
 
     [Fact]
-    public void Flags_values_on_both_sides()
+    public void Flags_when_no_number_is_in_common_and_shows_them_all()
     {
-        var discrepancy = _rule.Evaluate(Pair(Guest("A").WithPhones("0491573770"), Guest("A").WithPhones("0491573087")));
+        var discrepancy = _rule.Evaluate(Pair(
+            Guest("A").WithPhones("0491574632"),
+            Guest("A").WithPhones("0491576398", "0491576801")));
 
-        Assert.Equal("Only in Source: 0491573770; Only in Processed: 0491573087", discrepancy?.Detail);
+        Assert.NotNull(discrepancy);
+        Assert.Equal(DiscrepancyType.MobileNumberMismatch, discrepancy.Type);
+        Assert.Equal("Nothing in common", discrepancy.Detail);
+        Assert.Equal("0491574632", discrepancy.SourceValue);
+        Assert.Equal("0491576398\n0491576801", discrepancy.ProcessedValue);
     }
 
     [Theory]
@@ -200,6 +201,15 @@ public class EmailMismatchRuleTests
         Assert.Null(_rule.Evaluate(Pair(Guest("A").WithEmails("a@x.com"), Guest("A").WithEmails("a@x.com"))));
 
     [Fact]
+    public void Address_in_either_email_column_is_enough()
+    {
+        // The master list's Email 1 and Email 2 are read into one set.
+        Assert.Null(_rule.Evaluate(Pair(
+            Guest("A").WithEmails("luca.dimarco@example.com"),
+            Guest("A").WithEmails("luca@dimarco.example.org", "luca.dimarco@example.com"))));
+    }
+
+    [Fact]
     public void Flags_different_addresses()
     {
         var discrepancy = _rule.Evaluate(Pair(
@@ -208,7 +218,7 @@ public class EmailMismatchRuleTests
 
         Assert.NotNull(discrepancy);
         Assert.Equal(DiscrepancyType.EmailMismatch, discrepancy.Type);
-        Assert.Equal("Only in Source: olivia.grant@example.com; Only in Processed: ogrant@example.org", discrepancy.Detail);
+        Assert.Equal("Nothing in common", discrepancy.Detail);
     }
 
     [Fact]
