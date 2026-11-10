@@ -16,7 +16,7 @@ public sealed record CliOptions
 
         Options:
           --folder <folder>   Folder to search for the three files (default: the current folder)
-          --output <file>     Where to save the results (default: "GALA Reconciliation <date> <time>.xlsx"
+          --output <file>     Where to save the results (default: "Guest List Reconciliation <date> <time>.xlsx"
                               in the folder). The highlighted copy goes next to it. Can also be a folder.
           --strict            Also flag days marked N in the master list that have no ticket in the export
           --no-pause          Don't wait for a key press before closing

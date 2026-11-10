@@ -7,10 +7,13 @@ using static GalaReconciler.Core.Parsing.ProcessedGuestListParser;
 namespace GalaReconciler.Cli;
 
 /// <summary>
-/// Saves a copy of the master guest list with every difference marked: changed cells in yellow with a note
-/// giving the RSVP export's value, and the names of people who aren't in the export in red. The original file
-/// is never modified.
+/// Saves a copy of the master guest list with every difference marked: changed cells in yellow, and the names
+/// of people who aren't in the export in red. The original file is never modified.
 /// </summary>
+/// <remarks>
+/// Adding a note to each marked cell (with the RSVP export's value) is commented out in <see cref="Write"/> for
+/// now; <see cref="Marks"/> still builds the note text so it can be switched back on.
+/// </remarks>
 public static class ProcessedFileHighlighter
 {
     public const string NoteAuthor = "GALA Reconciler";
@@ -42,7 +45,12 @@ public static class ProcessedFileHighlighter
                 {
                     var cell = sheet.Cell(row.RowNumber, column);
                     cell.Style.Fill.BackgroundColor = fill;
-                    AddNote(cell, note);
+
+                    // Notes on the highlighted cells are turned off for now: the colour is enough, and the
+                    // Differences sheet of the results workbook has both values. Uncomment to bring them back.
+                    // AddNote(cell, note);
+                    _ = note;
+
                     highlighted.Add(cell);
                 }
             }
@@ -117,6 +125,7 @@ public static class ProcessedFileHighlighter
     }
 
     /// <summary>Adds to any note already on the cell (the list's own, or another difference's).</summary>
+    /// <remarks>Not called while notes are turned off (see <see cref="Write"/>).</remarks>
     private static void AddNote(IXLCell cell, string text)
     {
         if (cell.HasComment)

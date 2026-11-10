@@ -23,8 +23,8 @@ How to use
 
 3. A window shows which files were used and how many differences were found. Two files are saved in
    the same folder:
-     GALA Reconciliation <date> <time>.xlsx                                 (the results)
-     GALA Reconciliation <date> <time> - <master list name> (highlighted).xlsx (the highlighted copy)
+     Guest List Reconciliation <date> <time>.xlsx                                 (the results)
+     Guest List Reconciliation <date> <time> - <master list name> (highlighted).xlsx (the highlighted copy)
    Running it again never overwrites earlier files: new ones get "(2)", "(3)" and so on.
 
 4. Press any key to close the window.
@@ -36,8 +36,8 @@ The highlighted copy of the master list
 ---------------------------------------
 
 It is your master list exactly as it was, with:
-  Yellow cells   A value that differs from the RSVP export. Hover over the cell (or look for the red
-                 corner) to see a note with the RSVP export's value and this list's value.
+  Yellow cells   A value that differs from the RSVP export. The Differences sheet of the results
+                 workbook shows the RSVP export's value and this list's value.
   Red names      First Name and Surname of people who are not in the RSVP export at all.
                  A "guest" in the Guest Name column (name not known yet) is never marked as missing.
 

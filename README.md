@@ -42,8 +42,8 @@ Download `GalaReconciler-win-x64` from the latest run of the **Console app** wor
    list (any file names).
 2. Double-click it.
 3. Two files are saved in the same folder, and the window waits for a key press so the summary can be read:
-   - `GALA Reconciliation <date> <time>.xlsx`: the results
-   - `GALA Reconciliation <date> <time> - <master list name> (highlighted).xlsx`: the highlighted copy
+   - `Guest List Reconciliation <date> <time>.xlsx`: the results
+   - `Guest List Reconciliation <date> <time> - <master list name> (highlighted).xlsx`: the highlighted copy
 
    Re-running never overwrites earlier files; both get the next "(2)", "(3)"… number together.
 
@@ -52,8 +52,8 @@ kept) with every difference marked on its own row:
 
 | Mark | Meaning |
 |---|---|
-| Yellow cell with a note | The value differs from the RSVP export. The note gives both values (or, for a day, both answers). Marked cells: the day columns, Prenom, Postnom, Position, Phone, Email 1/Email 2. |
-| Red First Name and Surname | The person isn't in the RSVP export. The note gives a possible match if there's a similar name. A `guest` in Guest Name (name not known yet) is never reported as missing; it's only compared when the export has an extra ticket for it. |
+| Yellow cell | The value differs from the RSVP export (the Differences sheet in the results gives both values). Marked cells: the day columns, Prenom, Postnom, Position, Phone, Email 1/Email 2. |
+| Red First Name and Surname | The person isn't in the RSVP export (the results give a possible match if there's a similar name). A `guest` in Guest Name (name not known yet) is never reported as missing; it's only compared when the export has an extra ticket for it. |
 
 People only in the RSVP export have no row to mark; they're listed in the results as "Guest not found".
 
@@ -87,7 +87,7 @@ its rows show in the results as `<sheet> (Gala RSVP) · row …`. Its columns ar
 position are used when they're there.
 
 How the files are found: every `.xlsx` in the folder is opened (except Excel's `~$` lock files and earlier
-`GALA Reconciliation…` reports). Both exports have `Ticket type` and `Order id` columns: the one whose ticket types
+`Guest List Reconciliation…` reports, and older `GALA Reconciliation…` ones). Both exports have `Ticket type` and `Order id` columns: the one whose ticket types
 are mostly "RSVP - Attending" / "RSVP - Not attending" is the Gala RSVP export, the other is the RSVP export. The
 one whose first sheet has `Surname`, `Guest Name` and the day columns is the master list. If any of the three is
 missing, or there's more than one candidate, the app says so instead of guessing.
@@ -231,7 +231,7 @@ src/GalaReconciler.Cli/            console app → GalaReconciler.exe
   CliApp.cs                        find files → compare → save report
   InputFileFinder.cs               picks the three workbooks out of a folder
   ExcelReportWriter.cs             results workbook: Summary / Differences / Warnings
-  ProcessedFileHighlighter.cs      highlighted copy of the master list (yellow cells with notes, red names)
+  ProcessedFileHighlighter.cs      highlighted copy of the master list (yellow cells, red names)
   Properties/PublishProfiles/win-x64.pubxml   single-file publish settings
 
 src/GalaReconciler.Web/            web app

@@ -169,7 +169,7 @@ public sealed record OutputPaths(string Results, string HighlightedCopy)
     public const string HighlightedSuffix = "(highlighted)";
 
     /// <summary>
-    /// Default "GALA Reconciliation 2026-11-09 1430.xlsx" and "GALA Reconciliation 2026-11-09 1430 - Master list
+    /// Default "Guest List Reconciliation 2026-11-09 1430.xlsx" and "Guest List Reconciliation 2026-11-09 1430 - Master list
     /// (highlighted).xlsx" in the folder, numbered "(2)", "(3)"… rather than overwriting earlier runs.
     /// </summary>
     /// <param name="requested">--output: the results file, or a folder to put both files in.</param>

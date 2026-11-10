@@ -43,7 +43,10 @@ public sealed class InputFileException(string message) : Exception(message);
 public static class InputFileFinder
 {
     /// <summary>Files this app writes start with this; they (and highlighted copies) are skipped when searching.</summary>
-    public const string ReportFilePrefix = "GALA Reconciliation";
+    public const string ReportFilePrefix = "Guest List Reconciliation";
+
+    /// <summary>What earlier versions called their reports; still skipped so old reports in the folder are ignored.</summary>
+    public const string OldReportFilePrefix = "GALA Reconciliation";
 
     public static InputFiles Find(string folder)
     {
@@ -54,6 +57,7 @@ public static class InputFileFinder
                 // "~$…" files are Excel's lock files for workbooks that are open.
                 return !name.StartsWith("~$", StringComparison.Ordinal)
                     && !name.StartsWith(ReportFilePrefix, StringComparison.OrdinalIgnoreCase)
+                    && !name.StartsWith(OldReportFilePrefix, StringComparison.OrdinalIgnoreCase)
                     && !Path.GetFileNameWithoutExtension(name).EndsWith(OutputPaths.HighlightedSuffix, StringComparison.OrdinalIgnoreCase);
             })
             .Order(StringComparer.OrdinalIgnoreCase)

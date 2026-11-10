@@ -91,7 +91,8 @@ public sealed class InputFileFinderTests : IDisposable
         _folder.AddSamples("zzz.xlsx", "aaa.xlsx", "mmm.xlsx");
         new WorkbookBuilder().Sheet("Sheet1", ["Name"], [["x"]]).SaveAs(_folder.File("Budget.xlsx"));
         System.IO.File.WriteAllText(_folder.File("~$aaa.xlsx"), "Excel lock file");
-        System.IO.File.WriteAllText(_folder.File("GALA Reconciliation 2026-11-09 1200.xlsx"), "an earlier report");
+        System.IO.File.WriteAllText(_folder.File("Guest List Reconciliation 2026-11-11 1200.xlsx"), "an earlier report");
+        System.IO.File.WriteAllText(_folder.File("GALA Reconciliation 2026-11-09 1200.xlsx"), "a report from an earlier version");
         System.IO.File.WriteAllText(_folder.File("notes.txt"), "not a workbook");
 
         var inputs = InputFileFinder.Find(_folder.Path);
@@ -269,7 +270,7 @@ public sealed class CliAppTests : IDisposable
         var reports = Reports();
         Assert.Equal(2, reports.Length);
         var results = Assert.Single(reports, r => !r.Contains("(highlighted)"));
-        Assert.Matches(@"^GALA Reconciliation \d{4}-\d{2}-\d{2} \d{4}\.xlsx$", results);
+        Assert.Matches(@"^Guest List Reconciliation \d{4}-\d{2}-\d{2} \d{4}\.xlsx$", results);
         Assert.Contains($"{Path.GetFileNameWithoutExtension(results)} - Master list (highlighted).xlsx", reports);
         Assert.Equal(sourceBefore, File.ReadAllBytes(_folder.File("RSVP export.xlsx")));
         Assert.Equal(processedBefore, File.ReadAllBytes(_folder.File("Master list.xlsx")));
@@ -351,14 +352,14 @@ public sealed class CliAppTests : IDisposable
         OutputPaths Paths(string? requested, string folder) => OutputPaths.For(requested, _folder.Path, folder, runAt, "Master list.xlsx");
 
         var first = Paths(null, _folder.Path);
-        Assert.Equal(_folder.File("GALA Reconciliation 2026-11-09 1430.xlsx"), first.Results);
-        Assert.Equal(_folder.File("GALA Reconciliation 2026-11-09 1430 - Master list (highlighted).xlsx"), first.HighlightedCopy);
+        Assert.Equal(_folder.File("Guest List Reconciliation 2026-11-09 1430.xlsx"), first.Results);
+        Assert.Equal(_folder.File("Guest List Reconciliation 2026-11-09 1430 - Master list (highlighted).xlsx"), first.HighlightedCopy);
 
         // Either file existing moves both on to the next number, so they always pair up.
         File.WriteAllText(first.HighlightedCopy, "existing");
         var second = Paths(null, _folder.Path);
-        Assert.Equal(_folder.File("GALA Reconciliation 2026-11-09 1430 (2).xlsx"), second.Results);
-        Assert.Equal(_folder.File("GALA Reconciliation 2026-11-09 1430 (2) - Master list (highlighted).xlsx"), second.HighlightedCopy);
+        Assert.Equal(_folder.File("Guest List Reconciliation 2026-11-09 1430 (2).xlsx"), second.Results);
+        Assert.Equal(_folder.File("Guest List Reconciliation 2026-11-09 1430 (2) - Master list (highlighted).xlsx"), second.HighlightedCopy);
 
         Assert.Equal(_folder.File("mine.xlsx"), Paths("mine", _folder.Path).Results);
         Assert.Equal(_folder.File("mine - Master list (highlighted).xlsx"), Paths("mine", _folder.Path).HighlightedCopy);
@@ -383,8 +384,13 @@ public sealed class ProcessedFileHighlighterTests : IDisposable
     private static IXLCell Cell(IXLWorksheet sheet, int row, string header) =>
         sheet.Cell(row, sheet.Row(1).CellsUsed().Single(c => c.GetString() == header).Address.ColumnNumber);
 
+    /// <summary>True when the highlighter coloured this cell yellow (differs) or red (not in the export).</summary>
+    private static bool IsMarked(IXLCell cell) =>
+        cell.Style.Fill.BackgroundColor == ProcessedFileHighlighter.ChangedFill
+        || cell.Style.Fill.BackgroundColor == ProcessedFileHighlighter.NotInExportFill;
+
     [Fact]
-    public void Marks_every_difference_on_the_right_cell_with_a_note()
+    public void Marks_every_difference_on_the_right_cell()
     {
         var (workbook, count) = Highlight();
         using var _ = workbook;
@@ -395,33 +401,34 @@ public sealed class ProcessedFileHighlighterTests : IDisposable
         Assert.Equal(13, count);
 
         // William's Phone cell has two numbers on separate lines and neither is in the export.
-        var williamPhone = Cell(sheet, 14, "Phone");
-        Assert.Equal(yellow, williamPhone.Style.Fill.BackgroundColor);
-        Assert.Contains("RSVP export: 0491574632", williamPhone.GetComment().Text);
-        Assert.Contains("This list: 0491576398, 0491576801", williamPhone.GetComment().Text);
-
+        Assert.Equal(yellow, Cell(sheet, 14, "Phone").Style.Fill.BackgroundColor);
         Assert.Equal(yellow, Cell(sheet, 3, "Prenom").Style.Fill.BackgroundColor);
-        Assert.Contains("RSVP export: Dr", Cell(sheet, 3, "Prenom").GetComment().Text);
         Assert.Equal(yellow, Cell(sheet, 5, "Postnom").Style.Fill.BackgroundColor);
-        Assert.Contains("RSVP export: OAM", Cell(sheet, 5, "Postnom").GetComment().Text);
         Assert.Equal(yellow, Cell(sheet, 11, "Position").Style.Fill.BackgroundColor);
         Assert.Equal(yellow, Cell(sheet, 7, "Email 1").Style.Fill.BackgroundColor);
 
         // Days: only the differing day is marked.
         Assert.Equal(yellow, Cell(sheet, 14, "SAT").Style.Fill.BackgroundColor);
-        Assert.False(Cell(sheet, 14, "FRI").HasComment);
-        Assert.Contains("Gala RSVP export: Attending\nThis list: Invited, no response", Cell(sheet, 12, "Grid Gala").GetComment().Text.ReplaceLineEndings("\n"));
+        Assert.False(IsMarked(Cell(sheet, 14, "FRI")));
+        Assert.Equal(yellow, Cell(sheet, 12, "Grid Gala").Style.Fill.BackgroundColor); // Clara: attending, but 1
 
         // Grid Gala against the Gala export: "RSVP - Not attending" must be N.
-        Assert.Equal(yellow, Cell(sheet, 17, "Grid Gala").Style.Fill.BackgroundColor);
-        Assert.Contains("Gala RSVP export: Not attending\nThis list: Attending", Cell(sheet, 17, "Grid Gala").GetComment().Text.ReplaceLineEndings("\n"));
-        Assert.False(Cell(sheet, 16, "Grid Gala").HasComment); // Grace: not attending and N agree
-        Assert.False(Cell(sheet, 13, "Grid Gala").HasComment); // Felix: attending and Y agree
+        Assert.Equal(yellow, Cell(sheet, 17, "Grid Gala").Style.Fill.BackgroundColor); // Tom: not attending, but Y
+        Assert.False(IsMarked(Cell(sheet, 16, "Grid Gala"))); // Grace: not attending and N agree
+        Assert.False(IsMarked(Cell(sheet, 13, "Grid Gala"))); // Felix: attending and Y agree
 
         // In the master list but not the export: name in red.
         Assert.Equal(ProcessedFileHighlighter.NotInExportFill, Cell(sheet, 10, "First Name").Style.Fill.BackgroundColor);
         Assert.Equal(ProcessedFileHighlighter.NotInExportFill, Cell(sheet, 15, "Surname").Style.Fill.BackgroundColor);
-        Assert.Contains("Possible match there: Ruby Macintyre", Cell(sheet, 15, "First Name").GetComment().Text);
+    }
+
+    [Fact]
+    public void Adds_no_notes_to_the_highlighted_cells()
+    {
+        var (workbook, _) = Highlight();
+        using var _workbook = workbook;
+
+        Assert.DoesNotContain(workbook.Worksheet(1).CellsUsed(), c => c.HasComment);
     }
 
     [Fact]
@@ -431,20 +438,20 @@ public sealed class ProcessedFileHighlighterTests : IDisposable
         using var _workbook = workbook;
         var sheet = workbook.Worksheet(1);
 
-        Assert.False(Cell(sheet, 9, "Position").HasComment);  // Oscar: export says "nil"
-        Assert.False(Cell(sheet, 3, "Position").HasComment);  // Leilani: "Guest of …" isn't a job title
-        Assert.False(Cell(sheet, 4, "Prenom").HasComment);    // Alice: "Ms." = "Ms"
-        Assert.False(Cell(sheet, 7, "Grid Gala").HasComment); // Ethan: 1 and no ticket agree
-        Assert.False(Cell(sheet, 7, "First Name").HasComment); // Ethan: his "guest" has no ticket, which isn't reported
-        Assert.False(Cell(sheet, 7, "Guest Name").HasComment);
-        Assert.False(Cell(sheet, 4, "First Name").HasComment);
+        Assert.False(IsMarked(Cell(sheet, 9, "Position")));   // Oscar: export says "nil"
+        Assert.False(IsMarked(Cell(sheet, 3, "Position")));   // Leilani: "Guest of …" isn't a job title
+        Assert.False(IsMarked(Cell(sheet, 4, "Prenom")));     // Alice: "Ms." = "Ms"
+        Assert.False(IsMarked(Cell(sheet, 7, "Grid Gala")));  // Ethan: 1 and no ticket agree
+        Assert.False(IsMarked(Cell(sheet, 7, "First Name"))); // Ethan: his "guest" has no ticket, which isn't reported
+        Assert.False(IsMarked(Cell(sheet, 7, "Guest Name")));
+        Assert.False(IsMarked(Cell(sheet, 4, "First Name")));
 
         // One matching phone or email is enough.
-        Assert.False(Cell(sheet, 2, "Phone").HasComment);     // Marco: one of his export numbers has a typo
-        Assert.False(Cell(sheet, 3, "Phone").HasComment);     // Leilani: one of her two export numbers matches
-        Assert.False(Cell(sheet, 4, "Phone").HasComment);     // Alice: one of the two numbers in the cell matches
-        Assert.False(Cell(sheet, 8, "Email 1").HasComment);   // Luca: his export email is in Email 2
-        Assert.False(Cell(sheet, 8, "Email 2").HasComment);
+        Assert.False(IsMarked(Cell(sheet, 2, "Phone")));      // Marco: one of his export numbers has a typo
+        Assert.False(IsMarked(Cell(sheet, 3, "Phone")));      // Leilani: one of her two export numbers matches
+        Assert.False(IsMarked(Cell(sheet, 4, "Phone")));      // Alice: one of the two numbers in the cell matches
+        Assert.False(IsMarked(Cell(sheet, 8, "Email 1")));    // Luca: his export email is in Email 2
+        Assert.False(IsMarked(Cell(sheet, 8, "Email 2")));
 
         // Everything else in the list is kept, including hidden columns and other data.
         Assert.True(sheet.Column(2).IsHidden);
