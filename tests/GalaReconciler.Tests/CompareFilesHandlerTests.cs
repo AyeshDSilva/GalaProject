@@ -110,6 +110,34 @@ public class CompareFilesHandlerTests
     }
 
     [Fact]
+    public void A_master_list_guest_with_no_ticket_in_the_export_is_not_reported()
+    {
+        // Ethan's Guest Name says "guest" and the export has no ticket for that guest.
+        Assert.Empty(For("Unnamed guest of Ethan Cole"));
+        Assert.DoesNotContain(Result.Discrepancies, d => d.Type == DiscrepancyType.GuestNotFound && d.HostDisplayName == "Ethan Cole");
+    }
+
+    [Fact]
+    public void Master_list_guest_whose_name_is_only_in_the_export()
+    {
+        // "guest" in the master list; the export names the guest. The unnamed entry isn't reported, but the
+        // named guest still is, so the master list can be updated with the name.
+        var handler = TestHandlers.CreateCompareFilesHandler();
+        using var source = new WorkbookBuilder().AddSourceSheet("RSVP",
+            new SourceTicket("Saturday attending", "Eddie", "Hughes", "O1"),
+            new SourceTicket("Saturday attending", "Jane", "Hughes", "O1") { BuyerFirstName = "Eddie", BuyerLastName = "Hughes" }).ToStream();
+        using var processed = new WorkbookBuilder().AddProcessedSheet("Sheet1",
+            new ProcessedGuest("Eddie", "Hughes") { Sat = "Y", GuestName = "guest" }).ToStream();
+
+        var result = handler.Handle(new CompareFilesRequest(source, "s", processed, "p"));
+
+        var notFound = Assert.Single(result.Discrepancies);
+        Assert.Equal(DiscrepancyType.GuestNotFound, notFound.Type);
+        Assert.Equal("Jane Hughes", notFound.GuestDisplayName);
+        Assert.Equal("Only in Source", notFound.Detail);
+    }
+
+    [Fact]
     public void Sam_is_only_in_source()
     {
         var discrepancy = Assert.Single(For("Sam Fletcher"));
@@ -165,7 +193,7 @@ public class CompareFilesHandlerTests
     {
         Assert.Equal(12, Result.Discrepancies.Count);
         Assert.Equal(14, Result.SourceGuestCount);
-        Assert.Equal(14, Result.ProcessedGuestCount);
+        Assert.Equal(15, Result.ProcessedGuestCount); // including Ethan's and Luca's unnamed guests
         Assert.Equal(12, Result.MatchedCount);
 
         // Ordered by name, with each guest grouped under their host (Clara after Henry, Leilani where Marco

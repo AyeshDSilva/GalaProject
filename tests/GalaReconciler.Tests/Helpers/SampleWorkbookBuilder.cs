@@ -116,9 +116,12 @@ public static class SampleWorkbookBuilder
                 Prenom = "Ms", Postnom = "AM", Sat = "Y", Organisation = "Harbour City FC", Phone = 491570110, Email1 = "ogrant@example.org",
             },
             null, // row 6: blank
-            new ProcessedGuest("Ethan", "Cole") // row 7: Grid Gala 1 = invited, no response; he has no Gala ticket, so that matches
+            // row 7: Grid Gala 1 = invited, no response; he has no Gala ticket, so that matches. His "guest" has no
+            // ticket in the export, which isn't reported (the name isn't known yet).
+            new ProcessedGuest("Ethan", "Cole")
             {
-                Prenom = "Mr", Sat = "N", GridGala = 1, Organisation = "Northwind Capital", Email1 = "ethan.cole@example.net",
+                Prenom = "Mr", Sat = "N", GridGala = 1, GuestName = "guest", Organisation = "Northwind Capital",
+                Email1 = "ethan.cole@example.net",
             },
             new ProcessedGuest("Luca", "Di Marco") // row 8: unnamed guest; his export email is in Email 2, which is enough
             {

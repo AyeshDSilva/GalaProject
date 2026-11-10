@@ -53,9 +53,12 @@ public sealed class CompareFilesHandler(
             }
         }
 
-        // Unmatched records only ever produce GuestNotFound.
+        // Unmatched records only ever produce GuestNotFound. A "guest" in the master list's Guest Name column
+        // (name not known yet) isn't reported when the export has no partner for it.
         items.AddRange(match.OnlyInSource.Select(u => (NotFound(u, inSource: true), SortKey.For(u.Record))));
-        items.AddRange(match.OnlyInProcessed.Select(u => (NotFound(u, inSource: false), SortKey.For(u.Record))));
+        items.AddRange(match.OnlyInProcessed
+            .Where(u => !u.Record.IsUnnamedGuest)
+            .Select(u => (NotFound(u, inSource: false), SortKey.For(u.Record))));
 
         var ordered = items
             .OrderBy(i => i.Sort.Group, StringComparer.Ordinal)

@@ -50,7 +50,7 @@ kept) with every difference marked on its own row:
 | Mark | Meaning |
 |---|---|
 | Yellow cell with a note | The value differs from the RSVP export. The note gives both values (or, for a day, both answers). Marked cells: the day columns, Prenom, Postnom, Position, Phone, Email 1/Email 2. |
-| Red First Name and Surname | The person isn't in the RSVP export. The note gives a possible match if there's a similar name. |
+| Red First Name and Surname | The person isn't in the RSVP export. The note gives a possible match if there's a similar name. A `guest` in Guest Name (name not known yet) is never reported as missing; it's only compared when the export has an extra ticket for it. |
 
 People only in the RSVP export have no row to mark; they're listed in the results as "Guest not found".
 

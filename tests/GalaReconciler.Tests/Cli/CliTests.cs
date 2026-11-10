@@ -380,6 +380,8 @@ public sealed class ProcessedFileHighlighterTests : IDisposable
         Assert.False(Cell(sheet, 3, "Position").HasComment);  // Leilani: "Guest of …" isn't a job title
         Assert.False(Cell(sheet, 4, "Prenom").HasComment);    // Alice: "Ms." = "Ms"
         Assert.False(Cell(sheet, 7, "Grid Gala").HasComment); // Ethan: 1 and no ticket agree
+        Assert.False(Cell(sheet, 7, "First Name").HasComment); // Ethan: his "guest" has no ticket, which isn't reported
+        Assert.False(Cell(sheet, 7, "Guest Name").HasComment);
         Assert.False(Cell(sheet, 4, "First Name").HasComment);
 
         // One matching phone or email is enough.

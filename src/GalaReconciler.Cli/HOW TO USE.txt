@@ -37,6 +37,7 @@ It is your master list exactly as it was, with:
   Yellow cells   A value that differs from the RSVP export. Hover over the cell (or look for the red
                  corner) to see a note with the RSVP export's value and this list's value.
   Red names      First Name and Surname of people who are not in the RSVP export at all.
+                 A "guest" in the Guest Name column (name not known yet) is never marked as missing.
 
 People who are only in the RSVP export can't be highlighted here (they have no row); they are listed in
 the results workbook as "Guest not found".
