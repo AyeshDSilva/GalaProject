@@ -4,15 +4,32 @@ namespace GalaReconciler.Tests.Helpers;
 /// Realistic sample files for manual testing (written to samples/ by <c>SampleWorkbookTests</c>) and for the
 /// end-to-end handler test. Each person exercises a specific behaviour, noted alongside.
 /// </summary>
+/// <remarks>
+/// The console app takes three files: the RSVP export (<see cref="Source"/>, Thursday to Sunday), the separate
+/// Gala RSVP export (<see cref="Gala"/>, "RSVP - Attending" / "RSVP - Not attending") and the master list
+/// (<see cref="Processed"/>). The web app still takes one export with Grid Gala in it:
+/// <see cref="SingleExportSource"/> holds the same tickets that way.
+/// </remarks>
 public static class SampleWorkbookBuilder
 {
     public const string SuiteSheet = "Thurs_Sun Suite RSVP";
-    public const string GalaSheet = "Grid Gala RSVP";
+    public const string GalaSheet = "attendee-report";
     public const string ProcessedSheetName = "Sheet1";
 
-    public static WorkbookBuilder Source() => new WorkbookBuilder()
-        .AddSourceSheet(
-            SuiteSheet,
+    /// <summary>The main RSVP export: Thursday to Sunday only.</summary>
+    public static WorkbookBuilder Source() => new WorkbookBuilder().AddSourceSheet(SuiteSheet, SuiteTickets());
+
+    /// <summary>The separate Gala RSVP export.</summary>
+    public static WorkbookBuilder Gala() => new WorkbookBuilder()
+        .AddSourceSheet(GalaSheet, GalaTickets("RSVP - Attending", "RSVP - Not attending"));
+
+    /// <summary>One export holding the days and Grid Gala ("Grid Gala attending"), as the web app reads it.</summary>
+    public static WorkbookBuilder SingleExportSource() => new WorkbookBuilder()
+        .AddSourceSheet(SuiteSheet, SuiteTickets())
+        .AddSourceSheet("Grid Gala RSVP", GalaTickets("Grid Gala attending", "Grid Gala not attending"));
+
+    private static SourceTicket[] SuiteTickets() =>
+        [
             // Marco (rows 2, 4, 6, 8) and his guest Leilani (rows 3, 5, 7, 9) on one order, interleaved.
             // Marco's Friday number is a numeric cell (leading zero lost); his Sunday number has a typo, but his
             // other number matches the master list, so his phone isn't flagged. Same for Leilani's second number.
@@ -71,27 +88,40 @@ public static class SampleWorkbookBuilder
             new SourceTicket("Thursday attending", "Ruby", "Macintyre", "DM55TYUI")
             {
                 Mobile = "0491 575 254", Email = "ruby.macintyre@example.com",
-            })
-        .AddSourceSheet(
-            GalaSheet,
+            },
+        ];
+
+    private static SourceTicket[] GalaTickets(string attending, string notAttending) =>
+        [
             // Mobile and landline in separate columns; Processed has both in one multi-line cell. Position "nil" is ignored.
-            new SourceTicket("Grid Gala attending", "Oscar", "Reid", "GG10JW01")
+            new SourceTicket(attending, "Oscar", "Reid", "GG10JW01")
             {
                 Title = "Mr", Mobile = "0491570737", Telephone = "(08) 7010 0175", Email = "oscar.reid@example.com", PositionTitle = "nil",
             },
             // Three people sharing one phone number; Clara and Felix are Henry's guests. Henry's position title differs.
-            new SourceTicket("Grid Gala attending", "Henry", "Walsh", "GG20TS02")
+            new SourceTicket(attending, "Henry", "Walsh", "GG20TS02")
             {
                 Title = "Mr", Telephone = "0491 571 266", Email = "henry.walsh@example.com", PositionTitle = "Managing Director",
             },
-            new SourceTicket("Grid Gala attending", "Clara", "Walsh", "GG20TS02")
+            new SourceTicket(attending, "Clara", "Walsh", "GG20TS02")
             {
                 Title = "Mrs", Telephone = "0491571266", BuyerFirstName = "Henry", BuyerLastName = "Walsh",
             },
-            new SourceTicket("Grid Gala attending", "Felix", "Moreau", "GG20TS02")
+            new SourceTicket(attending, "Felix", "Moreau", "GG20TS02")
             {
                 Title = "Mr", Telephone = "0491 571 266", BuyerFirstName = "Henry", BuyerLastName = "Walsh",
-            });
+            },
+            // Not attending, and N in the master list: no difference.
+            new SourceTicket(notAttending, "Grace", "Huang", "GG30HN03")
+            {
+                Title = "Ms", Mobile = "0491 573 330", Email = "grace.huang@example.com",
+            },
+            // Not attending, but still Y in the master list: Grid Gala differs.
+            new SourceTicket(notAttending, "Tom", "Baker", "GG40TB04")
+            {
+                Title = "Mr", Mobile = "0491 573 440", Email = "tom.baker@example.com",
+            },
+        ];
 
     public static WorkbookBuilder Processed() => new WorkbookBuilder()
         .AddProcessedSheet(
@@ -158,13 +188,22 @@ public static class SampleWorkbookBuilder
             new ProcessedGuest("Ruby", "McIntyre") // row 15
             {
                 Prenom = "Mr", Thurs = "Y", Phone = "0491 575 254", Email1 = "ruby.mcintyre@example.org",
+            },
+            new ProcessedGuest("Grace", "Huang") // row 16: N, and not attending in the Gala export
+            {
+                Prenom = "Ms", GridGala = "N", Phone = "0491 573 330", Email1 = "grace.huang@example.com",
+            },
+            new ProcessedGuest("Tom", "Baker") // row 17: Y, but not attending in the Gala export
+            {
+                Prenom = "Mr", GridGala = "Y", Phone = "0491 573 440", Email1 = "tom.baker@example.com",
             });
 
-    /// <summary>Writes Source.xlsx and Processed.xlsx into <paramref name="directory"/>.</summary>
+    /// <summary>Writes Source.xlsx, Gala.xlsx and Processed.xlsx into <paramref name="directory"/>.</summary>
     public static void WriteSamples(string directory)
     {
         Directory.CreateDirectory(directory);
         Source().SaveAs(Path.Combine(directory, "Source.xlsx"));
+        Gala().SaveAs(Path.Combine(directory, "Gala.xlsx"));
         Processed().SaveAs(Path.Combine(directory, "Processed.xlsx"));
     }
 

@@ -1,21 +1,23 @@
 GALA Reconciler
 ===============
 
-Compares the RSVP export from the ticketing system with the master guest list. It saves two new files:
+Compares the RSVP export and the Gala RSVP export from the ticketing system with the master guest list.
+It saves two new files:
 
   - a results workbook listing every difference, and
   - a highlighted copy of the master list, with the cells that need attention marked.
 
-Your two original files are only read. They are never changed.
+Your original files are only read. They are never changed.
 
 
 How to use
 ----------
 
-1. Put GalaReconciler.exe in the same folder as the two Excel files:
-     - the RSVP export (Source)
+1. Put GalaReconciler.exe in the same folder as the three Excel files:
+     - the RSVP export (Source): Thursday to Sunday
+     - the Gala RSVP export: ticket types "RSVP - Attending" and "RSVP - Not attending"
      - the master guest list (Processed)
-   The files can have any names. The app works out which is which from their column headers.
+   The files can have any names. The app works out which is which from their columns and ticket types.
 
 2. Double-click GalaReconciler.exe.
 
@@ -53,6 +55,8 @@ Days       Each day column in the master list means:
              blank   not invited (anything else is also treated as not invited, and listed as a warning)
            A day is highlighted when the RSVP export disagrees: "attending" must be Y, "not attending" must
            be N. With no ticket for that day, blank or 1 are both fine.
+Grid Gala  Checked against the Gala RSVP export in the same way: "RSVP - Attending" must be Y and
+           "RSVP - Not attending" must be N. With no Gala RSVP, blank or 1 are both fine.
 Title      "Please specify your title" wins over Title. Compared with Prenom.
 Post nominal  "Please specify your post nominal" wins over Post nominal. Compared with Postnom.
 Position   Position title, compared with Position. Rows whose Position says "Guest of ..." are skipped.
@@ -81,8 +85,9 @@ Warnings     Things that looked odd in the files, such as an unrecognised ticket
 If something goes wrong
 -----------------------
 
-"Couldn't find the RSVP export" / "Couldn't find the master guest list"
-    Check both files are .xlsx (not .xls or .csv) and are in the same folder as the app.
+"Couldn't find the RSVP export" / "Couldn't find the Gala RSVP export" / "Couldn't find the master guest list"
+    Check all three files are .xlsx (not .xls or .csv) and are in the same folder as the app. The Gala
+    RSVP export is recognised by its "RSVP - Attending" / "RSVP - Not attending" ticket types.
 
 "Found more than one ..."
     Move the files you don't want to compare out of the folder.
@@ -98,7 +103,8 @@ Running from a command prompt (optional)
 ----------------------------------------
 
   GalaReconciler                                   search the current folder
-  GalaReconciler source.xlsx processed.xlsx        use these two files
+  GalaReconciler source.xlsx gala.xlsx processed.xlsx
+                                                   use these three files (in any order)
   GalaReconciler --folder "C:\Gala\November"       search another folder
   GalaReconciler --output "C:\Reports\gala.xlsx"   choose where to save the results (the highlighted copy
                                                    goes next to it)

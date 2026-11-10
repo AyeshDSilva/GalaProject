@@ -59,7 +59,7 @@ public static class ProcessedFileHighlighter
         switch (d.Type)
         {
             case DiscrepancyType.GuestNotFound:
-                var note = $"{who} is not in the RSVP export.";
+                var note = $"{who} is not in the RSVP export or the Gala RSVP export.";
                 if (d.PossibleMatch is not null)
                 {
                     note += $" Possible match there: {d.PossibleMatch}.";
@@ -73,8 +73,9 @@ public static class ProcessedFileHighlighter
                 foreach (var day in d.Days.Where(day => day.IsDifferent))
                 {
                     var info = EventDays.Get(day.Day);
+                    var export = day.Day == EventDay.GridGala ? "Gala RSVP export" : "RSVP export";
                     yield return (info.ProcessedHeader, ChangedFill,
-                        $"{who}, {info.TicketTypeLabel}\nRSVP export: {day.Source.ToDisplay()}\nThis list: {day.Processed.ToDisplay()}");
+                        $"{who}, {info.TicketTypeLabel}\n{export}: {day.Source.ToDisplay()}\nThis list: {day.Processed.ToDisplay()}");
                 }
 
                 break;

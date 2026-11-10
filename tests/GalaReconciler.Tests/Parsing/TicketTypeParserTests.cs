@@ -29,4 +29,29 @@ public class TicketTypeParserTests
     [InlineData(null)]
     public void Rejects_unknown_types(string? ticketType) =>
         Assert.False(TicketTypeParser.TryParse(ticketType, out _, out _));
+
+    [Theory]
+    [InlineData("RSVP - Attending", AttendanceState.Attending)]
+    [InlineData("RSVP - Not attending", AttendanceState.NotAttending)]
+    [InlineData("rsvp - not  attending", AttendanceState.NotAttending)]
+    [InlineData("RSVP – Attending", AttendanceState.Attending)]
+    [InlineData("RSVP Attending", AttendanceState.Attending)]
+    [InlineData("Grid Gala not attending", AttendanceState.NotAttending)]
+    public void Gala_export_ticket_types_are_grid_gala(string ticketType, AttendanceState state)
+    {
+        Assert.True(TicketTypeParser.TryParseGala(ticketType, out var day, out var parsedState));
+        Assert.Equal(EventDay.GridGala, day);
+        Assert.Equal(state, parsedState);
+    }
+
+    [Theory]
+    [InlineData("RSVP - Waitlist")]
+    [InlineData("RSVP")]
+    [InlineData("")]
+    public void Gala_export_rejects_unknown_types(string ticketType) =>
+        Assert.False(TicketTypeParser.TryParseGala(ticketType, out _, out _));
+
+    [Fact]
+    public void Main_export_does_not_read_gala_rsvp_types() =>
+        Assert.False(TicketTypeParser.TryParse("RSVP - Attending", out _, out _));
 }

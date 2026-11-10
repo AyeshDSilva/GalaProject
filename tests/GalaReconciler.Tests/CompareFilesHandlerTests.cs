@@ -1,6 +1,7 @@
 using GalaReconciler.Core;
 using GalaReconciler.Core.Domain;
 using GalaReconciler.Core.Matching;
+using GalaReconciler.Core.Parsing;
 using GalaReconciler.Tests.Helpers;
 using GalaReconciler.Web.Features.Reconciliation;
 
@@ -89,6 +90,38 @@ public class CompareFilesHandlerTests
         Assert.Equal(EventDay.GridGala, gala.Day);
         Assert.Equal(AttendanceState.Attending, gala.Source);
         Assert.Equal(AttendanceState.AwaitingResponse, gala.Processed);
+    }
+
+    [Fact]
+    public void Gala_rsvps_come_from_the_separate_gala_export()
+    {
+        var clara = Assert.Single(For("Clara Walsh"));
+        Assert.Equal(
+            new RowReference($"{SampleWorkbookBuilder.GalaSheet}{SourceRsvpParser.GalaSheetSuffix}", 4, "GG20TS02"),
+            Assert.Single(clara.SourceRows));
+    }
+
+    [Fact]
+    public void Gala_not_attending_must_be_N()
+    {
+        // Tom: "RSVP - Not attending" but Y in the master list.
+        var dates = Assert.Single(For("Tom Baker"));
+        Assert.Equal(DiscrepancyType.DatesMismatch, dates.Type);
+        var gala = Assert.Single(dates.Days, d => d.IsDifferent);
+        Assert.Equal(EventDay.GridGala, gala.Day);
+        Assert.Equal(AttendanceState.NotAttending, gala.Source);
+        Assert.Equal(AttendanceState.Attending, gala.Processed);
+
+        // Grace: "RSVP - Not attending" and N.
+        Assert.Empty(For("Grace Huang"));
+    }
+
+    [Fact]
+    public void Gala_attending_must_be_Y()
+    {
+        // Oscar, Henry and Felix are "RSVP - Attending" and Y: no Grid Gala difference.
+        Assert.DoesNotContain(Result.Discrepancies, d => d.Type == DiscrepancyType.DatesMismatch
+            && d.GuestDisplayName is "Oscar Reid" or "Henry Walsh" or "Felix Moreau");
     }
 
     [Fact]
@@ -191,17 +224,18 @@ public class CompareFilesHandlerTests
     [Fact]
     public void Totals_and_ordering()
     {
-        Assert.Equal(12, Result.Discrepancies.Count);
-        Assert.Equal(14, Result.SourceGuestCount);
-        Assert.Equal(15, Result.ProcessedGuestCount); // including Ethan's and Luca's unnamed guests
-        Assert.Equal(12, Result.MatchedCount);
+        Assert.Equal(13, Result.Discrepancies.Count);
+        Assert.Equal(16, Result.SourceGuestCount);    // both exports together
+        Assert.Equal(17, Result.ProcessedGuestCount); // including Ethan's and Luca's unnamed guests
+        Assert.Equal(14, Result.MatchedCount);
+        Assert.Equal("Gala.xlsx", Result.GalaFileName);
 
         // Ordered by name, with each guest grouped under their host (Clara after Henry, Leilani where Marco
         // would be, Maeve where Oscar Reid would be), then by type.
         Assert.Equal(
             [
                 "Ethan Cole", "Henry Walsh", "Clara Walsh", "Leilani Fonua", "Olivia Grant-Taylor", "Olivia Grant-Taylor",
-                "Maeve O'Connell", "Ruby Macintyre", "Ruby McIntyre", "Sam Fletcher", "William Hartley", "William Hartley",
+                "Maeve O'Connell", "Ruby Macintyre", "Ruby McIntyre", "Sam Fletcher", "Tom Baker", "William Hartley", "William Hartley",
             ],
             Result.Discrepancies.Select(d => d.GuestDisplayName));
     }

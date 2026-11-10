@@ -6,12 +6,18 @@ namespace GalaReconciler.Core.Parsing;
 
 /// <summary>
 /// Reads the ticketing system's RSVP export: every sheet, one row per ticket per day,
-/// grouped into one <see cref="GuestRecord"/> per person.
+/// grouped into one <see cref="GuestRecord"/> per person. The Grid Gala RSVPs can come in a separate
+/// export ("RSVP - Attending" / "RSVP - Not attending"); its tickets are added to the same people.
 /// </summary>
 public sealed class SourceRsvpParser
 {
     public const string FileLabel = "Source file (RSVP export)";
-    private const string WarningFile = "Source";
+    public const string GalaFileLabel = "Gala RSVP export";
+    public const string WarningFile = "Source";
+    public const string GalaWarningFile = "Gala";
+
+    /// <summary>Added to the sheet name of Gala export rows so they can't be confused with the main export's sheets.</summary>
+    public const string GalaSheetSuffix = " (Gala RSVP)";
 
     /// <summary>
     /// Header text, matched exactly and case-sensitively: "First name" (ticket holder, column B) and
@@ -44,11 +50,51 @@ public sealed class SourceRsvpParser
         Headers.Mobile, Headers.Telephone, Headers.Email,
     ];
 
-    public ParseResult Parse(Stream stream)
+    /// <summary>
+    /// The Gala export's columns are similar to the main export's, but only these are needed: the rest (buyer,
+    /// attendee name, phones, email, title…) are read when present.
+    /// </summary>
+    private static readonly string[] GalaRequiredHeaders =
+    [
+        Headers.TicketType, Headers.OrderId, Headers.FirstName, Headers.LastName,
+    ];
+
+    private delegate bool TicketTypeReader(string? ticketType, out EventDay day, out AttendanceState state);
+
+    private sealed record ExportFile(
+        string FileLabel,
+        string WarningFile,
+        IReadOnlyList<string> RequiredHeaders,
+        string SheetSuffix,
+        TicketTypeReader ReadTicketType);
+
+    private static readonly ExportFile MainExport =
+        new(FileLabel, WarningFile, RequiredHeaders, "", TicketTypeParser.TryParse);
+
+    private static readonly ExportFile GalaExport =
+        new(GalaFileLabel, GalaWarningFile, GalaRequiredHeaders, GalaSheetSuffix, TicketTypeParser.TryParseGala);
+
+    public ParseResult Parse(Stream stream) => Parse(stream, galaStream: null);
+
+    /// <param name="stream">The main RSVP export (Thursday to Sunday, and Grid Gala if it's still in there).</param>
+    /// <param name="galaStream">The separate Gala RSVP export, if there is one.</param>
+    public ParseResult Parse(Stream stream, Stream? galaStream)
     {
-        using var workbook = WorkbookFormatException.OpenWorkbook(stream, FileLabel);
         var warnings = new List<ReconciliationWarning>();
         var tickets = new List<Ticket>();
+
+        ReadExport(stream, MainExport, tickets, warnings);
+        if (galaStream is not null)
+        {
+            ReadExport(galaStream, GalaExport, tickets, warnings);
+        }
+
+        return new ParseResult(BuildRecords(tickets, warnings), warnings);
+    }
+
+    private static void ReadExport(Stream stream, ExportFile file, List<Ticket> tickets, List<ReconciliationWarning> warnings)
+    {
+        using var workbook = WorkbookFormatException.OpenWorkbook(stream, file.FileLabel);
         var sheetsRead = 0;
         (string Sheet, IReadOnlyList<string> Missing)? firstSkipped = null;
 
@@ -60,39 +106,37 @@ public sealed class SourceRsvpParser
             }
 
             var map = new HeaderMap(sheet, StringComparison.Ordinal);
-            var missing = map.Missing(RequiredHeaders);
+            var missing = map.Missing(file.RequiredHeaders);
 
             if (!map.Contains(Headers.TicketType) && !map.Contains(Headers.OrderId))
             {
                 // Not an RSVP sheet at all (e.g. a summary tab): skip it rather than fail the whole file.
                 firstSkipped ??= (sheet.Name, missing);
-                warnings.Add(new(WarningFile, $"Sheet '{sheet.Name}' was skipped because it has no 'Ticket type' or 'Order id' column."));
+                warnings.Add(new(file.WarningFile, $"Sheet '{sheet.Name}' was skipped because it has no 'Ticket type' or 'Order id' column."));
                 continue;
             }
 
             if (missing.Count > 0)
             {
-                throw MissingHeaders(sheet.Name, missing);
+                throw MissingHeaders(file.FileLabel, sheet.Name, missing);
             }
 
-            ReadSheet(sheet, ResolveColumns(map), tickets, warnings);
+            ReadSheet(sheet, ResolveColumns(map), file, tickets, warnings);
             sheetsRead++;
         }
 
         if (sheetsRead == 0)
         {
             throw firstSkipped is { } skipped
-                ? MissingHeaders(skipped.Sheet, skipped.Missing)
-                : new WorkbookFormatException(FileLabel, $"The {FileLabel} is empty.");
+                ? MissingHeaders(file.FileLabel, skipped.Sheet, skipped.Missing)
+                : new WorkbookFormatException(file.FileLabel, $"The {file.FileLabel} is empty.");
         }
-
-        return new ParseResult(BuildRecords(tickets, warnings), warnings);
     }
 
-    private static WorkbookFormatException MissingHeaders(string sheetName, IReadOnlyList<string> missing) =>
+    private static WorkbookFormatException MissingHeaders(string fileLabel, string sheetName, IReadOnlyList<string> missing) =>
         new(
-            FileLabel,
-            $"Sheet '{sheetName}' in the {FileLabel} is missing required column(s): {string.Join(", ", missing)}. " +
+            fileLabel,
+            $"Sheet '{sheetName}' in the {fileLabel} is missing required column(s): {string.Join(", ", missing)}. " +
             "Headers must be in row 1 and match exactly, including capital letters.",
             missing);
 
@@ -102,13 +146,14 @@ public sealed class SourceRsvpParser
         // ticket-holder and buyer columns even if a header is ever repeated.
         var title = map.Find(Headers.Title);
         var attendeeStart = title ?? 0;
-        int Find(string header, int after = 0) => map.Find(header, after) ?? map.Find(header)!.Value;
+        // Every required column is there; in the Gala export most of the others are optional.
+        int? Find(string header, int after = 0) => map.Find(header, after) ?? map.Find(header);
 
         return new Columns(
-            TicketType: Find(Headers.TicketType),
-            OrderId: Find(Headers.OrderId),
-            FirstName: Find(Headers.FirstName),
-            LastName: Find(Headers.LastName),
+            TicketType: Find(Headers.TicketType)!.Value,
+            OrderId: Find(Headers.OrderId)!.Value,
+            FirstName: Find(Headers.FirstName)!.Value,
+            LastName: Find(Headers.LastName)!.Value,
             BuyerFirstName: Find(Headers.BuyerFirstName),
             BuyerLastName: Find(Headers.BuyerLastName),
             Title: title,
@@ -138,8 +183,9 @@ public sealed class SourceRsvpParser
         return TextNormalizer.Clean(specified) ?? chosen;
     }
 
-    private static void ReadSheet(IXLWorksheet sheet, Columns columns, List<Ticket> tickets, List<ReconciliationWarning> warnings)
+    private static void ReadSheet(IXLWorksheet sheet, Columns columns, ExportFile file, List<Ticket> tickets, List<ReconciliationWarning> warnings)
     {
+        var sheetName = sheet.Name + file.SheetSuffix;
         var lastRow = sheet.LastRowUsed()!.RowNumber();
         for (var rowNumber = 2; rowNumber <= lastRow; rowNumber++)
         {
@@ -162,7 +208,7 @@ public sealed class SourceRsvpParser
             {
                 if (ticketType.Length > 0 || orderId.Length > 0)
                 {
-                    warnings.Add(new(WarningFile, $"{sheet.Name} row {rowNumber}: ticket has no attendee name and was skipped."));
+                    warnings.Add(new(file.WarningFile, $"{sheetName} row {rowNumber}: ticket has no attendee name and was skipped."));
                 }
 
                 continue;
@@ -172,7 +218,7 @@ public sealed class SourceRsvpParser
 
             EventDay? day = null;
             var state = AttendanceState.NoResponse;
-            if (TicketTypeParser.TryParse(ticketType, out var parsedDay, out var parsedState))
+            if (file.ReadTicketType(ticketType, out var parsedDay, out var parsedState))
             {
                 day = parsedDay;
                 state = parsedState;
@@ -180,7 +226,7 @@ public sealed class SourceRsvpParser
             else
             {
                 var shown = ticketType.Length == 0 ? "(blank)" : $"'{ticketType}'";
-                warnings.Add(new(WarningFile, $"{sheet.Name} row {rowNumber}: unrecognised ticket type {shown} for {displayName}. The row wasn't counted towards any day."));
+                warnings.Add(new(file.WarningFile, $"{sheetName} row {rowNumber}: unrecognised ticket type {shown} for {displayName}. The row wasn't counted towards any day."));
             }
 
             // Attendee contact details only. Buyer mobile/email are deliberately ignored: the buyer is
@@ -195,7 +241,7 @@ public sealed class SourceRsvpParser
             var buyerLast = Cell(columns.BuyerLastName);
 
             tickets.Add(new Ticket(
-                sheet.Name,
+                sheetName,
                 rowNumber,
                 orderId,
                 displayName,
@@ -349,17 +395,17 @@ public sealed class SourceRsvpParser
         int OrderId,
         int FirstName,
         int LastName,
-        int BuyerFirstName,
-        int BuyerLastName,
+        int? BuyerFirstName,
+        int? BuyerLastName,
         int? Title,
         int? TitleOther,
-        int AttendeeFirstName,
-        int AttendeeLastName,
+        int? AttendeeFirstName,
+        int? AttendeeLastName,
         int? PostNominal,
         int? PostNominalOther,
-        int Mobile,
-        int Telephone,
-        int Email,
+        int? Mobile,
+        int? Telephone,
+        int? Email,
         int? PositionTitle);
 
     private sealed record Ticket(

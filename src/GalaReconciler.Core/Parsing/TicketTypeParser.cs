@@ -28,4 +28,34 @@ public static class TicketTypeParser
         state = match.Groups[2].Success ? AttendanceState.NotAttending : AttendanceState.Attending;
         return true;
     }
+
+    // The Gala RSVP export has no day in its ticket types: "RSVP - Attending" / "RSVP - Not attending".
+    private static readonly Regex GalaPattern = new(
+        @"^RSVP\s*[-–—:]?\s*(not\s+)?attending$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Ticket types in the separate Gala RSVP export: "RSVP - Attending" or "RSVP - Not attending", always Grid Gala.
+    /// A day ticket such as "Grid Gala attending" is accepted too.
+    /// </summary>
+    public static bool TryParseGala(string? ticketType, out EventDay day, out AttendanceState state)
+    {
+        if (TryParse(ticketType, out day, out state))
+        {
+            return true;
+        }
+
+        var match = GalaPattern.Match(NameNormalizer.CleanDisplay(ticketType));
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        day = EventDay.GridGala;
+        state = match.Groups[1].Success ? AttendanceState.NotAttending : AttendanceState.Attending;
+        return true;
+    }
+
+    /// <summary>True for the Gala export's own "RSVP - …" ticket types (not day tickets).</summary>
+    public static bool IsGalaRsvp(string? ticketType) => GalaPattern.IsMatch(NameNormalizer.CleanDisplay(ticketType));
 }

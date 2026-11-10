@@ -70,12 +70,14 @@ public static partial class TestHandlers
     public static CompareFilesHandler CreateCompareFilesHandler() =>
         new ServiceCollection().AddComparison().BuildServiceProvider().GetRequiredService<CompareFilesHandler>();
 
-    /// <summary>The comparison of the two sample workbooks.</summary>
+    /// <summary>The comparison of the three sample workbooks, as the console app does it.</summary>
     public static ReconciliationResult CompareSamples()
     {
         using var source = SampleWorkbookBuilder.Source().ToStream();
+        using var gala = SampleWorkbookBuilder.Gala().ToStream();
         using var processed = SampleWorkbookBuilder.Processed().ToStream();
-        return CreateCompareFilesHandler().Handle(new CompareFilesRequest(source, "Source.xlsx", processed, "Processed.xlsx"));
+        return CreateCompareFilesHandler().Handle(
+            new CompareFilesRequest(source, "Source.xlsx", processed, "Processed.xlsx", gala, "Gala.xlsx"));
     }
 
     /// <summary>Posts both files through the real upload form and returns the run page URL it redirects to.</summary>
@@ -97,7 +99,7 @@ public static partial class TestHandlers
     }
 
     public static Task<string> UploadSamplesAsync(HttpClient client) =>
-        UploadAsync(client, SampleWorkbookBuilder.Source().ToStream(), SampleWorkbookBuilder.Processed().ToStream());
+        UploadAsync(client, SampleWorkbookBuilder.SingleExportSource().ToStream(), SampleWorkbookBuilder.Processed().ToStream());
 
     /// <summary>Polls the run page until the background worker has finished with it.</summary>
     public static async Task<string> WaitForRunAsync(HttpClient client, string runUrl)

@@ -42,11 +42,11 @@ public sealed class RunStoreTests : IDisposable
         Assert.NotNull(run);
         Assert.Equal(RunStatus.Completed, run.Status);
         Assert.Equal(4, run.GuestNotFoundCount);
-        Assert.Equal(2, run.DatesMismatchCount);
+        Assert.Equal(3, run.DatesMismatchCount);
         Assert.Equal(1, run.TitleMismatchCount);
         Assert.Equal(1, run.PostNominalMismatchCount);
         Assert.Equal(1, run.PositionMismatchCount);
-        Assert.Equal(12, run.DiscrepancyCount);
+        Assert.Equal(13, run.DiscrepancyCount);
         Assert.Equal(1, run.MobileNumberMismatchCount);
         Assert.Equal(2, run.EmailMismatchCount);
         Assert.Equal(1, run.WarningCount);

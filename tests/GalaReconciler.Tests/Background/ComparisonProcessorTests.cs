@@ -29,10 +29,10 @@ public sealed class ComparisonProcessorTests : IDisposable
     [Fact]
     public async Task Saves_results_and_notifies_processing_then_completed()
     {
-        var run = await ProcessAsync(SampleWorkbookBuilder.Source(), SampleWorkbookBuilder.Processed());
+        var run = await ProcessAsync(SampleWorkbookBuilder.SingleExportSource(), SampleWorkbookBuilder.Processed());
 
         Assert.Equal(RunStatus.Completed, run.Status);
-        Assert.Equal(12, run.Discrepancies.Count);
+        Assert.Equal(13, run.Discrepancies.Count);
         Assert.Equal([(run.Id, RunStatus.Processing), (run.Id, RunStatus.Completed)], _notifier.Calls);
     }
 
@@ -40,7 +40,7 @@ public sealed class ComparisonProcessorTests : IDisposable
     public async Task A_file_problem_fails_the_run_with_a_friendly_error()
     {
         // The files the wrong way round: the master list has none of the RSVP export's columns.
-        var run = await ProcessAsync(SampleWorkbookBuilder.Processed(), SampleWorkbookBuilder.Source());
+        var run = await ProcessAsync(SampleWorkbookBuilder.Processed(), SampleWorkbookBuilder.SingleExportSource());
 
         Assert.Equal(RunStatus.Failed, run.Status);
         Assert.Contains("Source file (RSVP export)", run.ErrorTitle);

@@ -5,11 +5,17 @@ using GalaReconciler.Core.Rules;
 
 namespace GalaReconciler.Core;
 
+/// <param name="GalaFile">
+/// The separate Gala RSVP export ("RSVP - Attending" / "RSVP - Not attending"), compared with the master list's
+/// Grid Gala column. Without it, Grid Gala comes from the main export's "Grid Gala …" tickets as before.
+/// </param>
 public sealed record CompareFilesRequest(
     Stream SourceFile,
     string SourceFileName,
     Stream ProcessedFile,
-    string ProcessedFileName);
+    string ProcessedFileName,
+    Stream? GalaFile = null,
+    string? GalaFileName = null);
 
 public sealed record ReconciliationResult(
     string SourceFileName,
@@ -20,7 +26,8 @@ public sealed record ReconciliationResult(
     IReadOnlyList<ReconciliationWarning> Warnings,
     int SourceGuestCount,
     int ProcessedGuestCount,
-    int MatchedCount);
+    int MatchedCount,
+    string? GalaFileName = null);
 
 /// <summary>Parse both files → match guests → run every rule over each matched pair.</summary>
 public sealed class CompareFilesHandler(
@@ -35,7 +42,7 @@ public sealed class CompareFilesHandler(
         var started = timeProvider.GetTimestamp();
         var runAt = timeProvider.GetLocalNow();
 
-        var source = sourceParser.Parse(request.SourceFile);
+        var source = sourceParser.Parse(request.SourceFile, request.GalaFile);
         var processed = processedParser.Parse(request.ProcessedFile);
         var match = matcher.Match(source.Records, processed.Records);
 
@@ -77,7 +84,8 @@ public sealed class CompareFilesHandler(
             [.. source.Warnings, .. processed.Warnings],
             source.Records.Count,
             processed.Records.Count,
-            match.Matched.Count);
+            match.Matched.Count,
+            request.GalaFile is null ? null : request.GalaFileName);
     }
 
     private static Discrepancy NotFound(UnmatchedGuest unmatched, bool inSource)

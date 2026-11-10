@@ -9,12 +9,14 @@ Compares the ticketing system's **RSVP export** (Source) with the hand-maintaine
 
 It comes in two forms that share the same comparison code:
 
-- **Console app (`GalaReconciler.exe`)**: put it in a folder with the two files and run it. It works out
-  which file is which and saves two new files next to them: a results workbook and a highlighted copy of
-  the master list. The original files are never changed.
+- **Console app (`GalaReconciler.exe`)**: put it in a folder with the three files (the RSVP export, the
+  separate **Gala RSVP export** and the master list) and run it. It works out which file is which and saves
+  two new files next to them: a results workbook and a highlighted copy of the master list. The original
+  files are never changed.
 - **Web app**: upload the two files in a browser. Each comparison runs in the background, is saved as a
   run in a local SQLite database (results only), and the run page updates over SignalR. The Runs page lists
-  past runs with filters.
+  past runs with filters. The web app still takes a single RSVP export, with Grid Gala as "Grid Gala
+  attending" tickets in it; it doesn't take the separate Gala RSVP export.
 
 Both read the uploaded workbooks in memory only and never store the input files.
 
@@ -36,7 +38,8 @@ Download `GalaReconciler-win-x64` from the latest run of the **Console app** wor
 (Actions tab → the run → Artifacts), or the zip on a release. It contains `GalaReconciler.exe` and
 `HOW TO USE.txt`.
 
-1. Put `GalaReconciler.exe` in the folder with the RSVP export and the master guest list (any file names).
+1. Put `GalaReconciler.exe` in the folder with the RSVP export, the Gala RSVP export and the master guest
+   list (any file names).
 2. Double-click it.
 3. Two files are saved in the same folder, and the window waits for a key press so the summary can be read:
    - `GALA Reconciliation <date> <time>.xlsx`: the results
@@ -67,6 +70,7 @@ The **results workbook** has three sheets:
 | | RSVP export (Source) | Master list (Processed) | Flagged when |
 |---|---|---|---|
 | Days | a ticket "… attending" / "… not attending" per day, or no ticket | `Y` invited and coming, `N` invited and not coming, `1` invited with no response yet, blank (or anything else) not invited | "attending" isn't `Y`; "not attending" isn't `N`; no ticket but `Y` (or `N` with `--strict`). No ticket matches blank or `1`. |
+| Grid Gala | the **Gala RSVP export**: "RSVP - Attending" / "RSVP - Not attending", or no ticket | Grid Gala, as for the days | "RSVP - Attending" isn't `Y`; "RSVP - Not attending" isn't `N`; no RSVP but `Y` (or `N` with `--strict`). |
 | Title | "Please specify your title", else Title | Prenom | different |
 | Post nominal | "Please specify your post nominal", else Post nominal | Postnom | different |
 | Position | Position title | Position (rows saying "Guest of …" are skipped) | different |
@@ -77,15 +81,21 @@ For title, post nominal and position, a blank or `nil` value in the export never
 master list is left as it is), and case, full stops and spacing are ignored (`Mr.` = `Mr`, `O.A.M.` = `OAM`).
 A drop-down value of "Other" with nothing specified counts as blank. The titles Miss and Ms count as the same.
 
-How the files are found: every `.xlsx` in the folder is opened (except Excel's `~$` lock files and earlier
-`GALA Reconciliation…` reports). The one with `Ticket type` and `Order id` columns is the RSVP export, and the
-one whose first sheet has `Surname`, `Guest Name` and the day columns is the master list. If either is missing,
-or there's more than one candidate, the app says so instead of guessing.
+The Gala RSVP export is matched to people the same way as the RSVP export (by name, then by a shared email), and
+its rows show in the results as `<sheet> (Gala RSVP) · row …`. Its columns are like the RSVP export's, but only
+`Ticket type`, `Order id`, `First name` and `Last name` are required; the attendee name, phones, email, title and
+position are used when they're there.
 
-From a command prompt:
+How the files are found: every `.xlsx` in the folder is opened (except Excel's `~$` lock files and earlier
+`GALA Reconciliation…` reports). Both exports have `Ticket type` and `Order id` columns: the one whose ticket types
+are mostly "RSVP - Attending" / "RSVP - Not attending" is the Gala RSVP export, the other is the RSVP export. The
+one whose first sheet has `Surname`, `Guest Name` and the day columns is the master list. If any of the three is
+missing, or there's more than one candidate, the app says so instead of guessing.
+
+From a command prompt (the three file names can be given in any order):
 
 ```
-GalaReconciler [source.xlsx processed.xlsx] [--folder <folder>] [--output <file or folder>] [--strict] [--no-pause]
+GalaReconciler [source.xlsx gala.xlsx processed.xlsx] [--folder <folder>] [--output <file or folder>] [--strict] [--no-pause]
 ```
 
 Exit codes: `0` report written, `1` a problem with the input files or arguments, `2` unexpected error.
@@ -200,8 +210,9 @@ dotnet test
 ```
 
 Tests that start the web app use a throwaway SQLite file in the temp folder; console app tests use temp
-folders. The test run also writes `samples/Source.xlsx` and `samples/Processed.xlsx` (fictional data, from
-`tests/GalaReconciler.Tests/Helpers/SampleWorkbookBuilder.cs`) for trying either app.
+folders. The test run also writes `samples/Source.xlsx`, `samples/Gala.xlsx` and `samples/Processed.xlsx`
+(fictional data, from `tests/GalaReconciler.Tests/Helpers/SampleWorkbookBuilder.cs`) for trying the console app.
+If the samples are open in Excel, set `GALA_SAMPLES_DIR` to write them to another folder.
 
 ## Project layout
 
@@ -218,7 +229,7 @@ src/GalaReconciler.Core/           the comparison, shared by both apps
 
 src/GalaReconciler.Cli/            console app → GalaReconciler.exe
   CliApp.cs                        find files → compare → save report
-  InputFileFinder.cs               picks the two workbooks out of a folder
+  InputFileFinder.cs               picks the three workbooks out of a folder
   ExcelReportWriter.cs             results workbook: Summary / Differences / Warnings
   ProcessedFileHighlighter.cs      highlighted copy of the master list (yellow cells with notes, red names)
   Properties/PublishProfiles/win-x64.pubxml   single-file publish settings

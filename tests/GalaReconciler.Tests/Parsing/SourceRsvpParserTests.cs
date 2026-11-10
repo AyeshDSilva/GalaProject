@@ -218,4 +218,70 @@ public class SourceRsvpParserTests
         var ex = Assert.Throws<WorkbookFormatException>(() => new SourceRsvpParser().Parse(stream));
         Assert.Contains("valid .xlsx", ex.Message);
     }
+
+    private static ParseResult ParseWithGala(WorkbookBuilder main, WorkbookBuilder gala)
+    {
+        using var mainStream = main.ToStream();
+        using var galaStream = gala.ToStream();
+        return new SourceRsvpParser().Parse(mainStream, galaStream);
+    }
+
+    [Fact]
+    public void Gala_export_tickets_are_added_to_the_same_person_as_grid_gala()
+    {
+        var result = ParseWithGala(
+            new WorkbookBuilder().AddSourceSheet("RSVP", new SourceTicket("Saturday attending", "Marco", "Bellini", "O1")),
+            new WorkbookBuilder().AddSourceSheet("attendee-report",
+                new SourceTicket("RSVP - Not attending", "Marco", "Bellini", "G1"),
+                new SourceTicket("RSVP - Attending", "Alice", "Romano", "G2")));
+
+        var marco = Single(result, "Marco Bellini");
+        Assert.Equal(AttendanceState.Attending, marco.GetAttendance(EventDay.Saturday));
+        Assert.Equal(AttendanceState.NotAttending, marco.GetAttendance(EventDay.GridGala));
+        Assert.Equal(
+            [new RowReference("RSVP", 2, "O1"), new RowReference("attendee-report (Gala RSVP)", 2, "G1")],
+            marco.Rows);
+
+        var alice = Single(result, "Alice Romano");
+        Assert.Equal(AttendanceState.Attending, alice.GetAttendance(EventDay.GridGala));
+        Assert.Empty(result.Warnings);
+    }
+
+    [Fact]
+    public void Gala_export_needs_only_ticket_type_order_id_and_name_columns()
+    {
+        var gala = new WorkbookBuilder().Sheet(
+            "attendee-report",
+            ["First name", "Last name", "Ticket type", "Order id", "Ticket no."],
+            [["Ben", "Edwards", "RSVP - Attending", "J4G7A2KX", "1st"], ["Greg", "Vella", "RSVP - Not attending", "J4G7A2KX", "2nd"]]);
+
+        var result = ParseWithGala(new WorkbookBuilder().AddSourceSheet("RSVP", new SourceTicket("Friday attending", "Sam", "Fletcher")), gala);
+
+        Assert.Equal(AttendanceState.Attending, Single(result, "Ben Edwards").GetAttendance(EventDay.GridGala));
+        Assert.Equal(AttendanceState.NotAttending, Single(result, "Greg Vella").GetAttendance(EventDay.GridGala));
+    }
+
+    [Fact]
+    public void Unknown_gala_ticket_type_is_a_gala_warning()
+    {
+        var result = ParseWithGala(
+            new WorkbookBuilder().AddSourceSheet("RSVP", new SourceTicket("Friday attending", "Sam", "Fletcher")),
+            new WorkbookBuilder().AddSourceSheet("attendee-report", new SourceTicket("RSVP - Waitlist", "Ben", "Edwards")));
+
+        var warning = Assert.Single(result.Warnings);
+        Assert.Equal(SourceRsvpParser.GalaWarningFile, warning.File);
+        Assert.Contains("'RSVP - Waitlist'", warning.Message);
+    }
+
+    [Fact]
+    public void Missing_column_in_the_gala_export_names_that_file()
+    {
+        var gala = new WorkbookBuilder().Sheet("attendee-report", ["First name", "Ticket type", "Order id"], [["Ben", "RSVP - Attending", "X"]]);
+
+        var ex = Assert.Throws<WorkbookFormatException>(() =>
+            ParseWithGala(new WorkbookBuilder().AddSourceSheet("RSVP", new SourceTicket("Friday attending", "Sam", "Fletcher")), gala));
+
+        Assert.Equal(SourceRsvpParser.GalaFileLabel, ex.FileLabel);
+        Assert.Equal(["Last name"], ex.MissingHeaders);
+    }
 }

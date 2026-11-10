@@ -5,17 +5,21 @@ namespace GalaReconciler.Tests;
 public class SampleWorkbookTests
 {
     /// <summary>
-    /// Writes samples/Source.xlsx and samples/Processed.xlsx at the repository root for manual testing.
-    /// Run on its own with: dotnet test --filter SampleWorkbookTests
+    /// Writes samples/Source.xlsx, samples/Gala.xlsx and samples/Processed.xlsx at the repository root for manual
+    /// testing. Run on its own with: dotnet test --filter SampleWorkbookTests
+    /// Set GALA_SAMPLES_DIR to write them somewhere else (e.g. while the samples are open in Excel).
     /// </summary>
     [Fact]
     public void Writes_sample_workbooks()
     {
-        var directory = Path.Combine(FindRepositoryRoot(), "samples");
+        var directory = Environment.GetEnvironmentVariable("GALA_SAMPLES_DIR") is { Length: > 0 } other
+            ? other
+            : Path.Combine(FindRepositoryRoot(), "samples");
 
         SampleWorkbookBuilder.WriteSamples(directory);
 
         Assert.True(File.Exists(Path.Combine(directory, "Source.xlsx")));
+        Assert.True(File.Exists(Path.Combine(directory, "Gala.xlsx")));
         Assert.True(File.Exists(Path.Combine(directory, "Processed.xlsx")));
     }
 

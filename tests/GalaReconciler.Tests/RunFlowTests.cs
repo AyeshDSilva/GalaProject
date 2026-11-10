@@ -35,7 +35,7 @@ public class RunFlowTests(GalaWebApplicationFactory factory) : IClassFixture<Gal
     {
         var client = Client();
 
-        var runUrl = await TestHandlers.UploadAsync(client, SampleWorkbookBuilder.Processed().ToStream(), SampleWorkbookBuilder.Source().ToStream());
+        var runUrl = await TestHandlers.UploadAsync(client, SampleWorkbookBuilder.Processed().ToStream(), SampleWorkbookBuilder.SingleExportSource().ToStream());
 
         var html = await TestHandlers.WaitForRunAsync(client, runUrl);
         Assert.Contains("missing required column(s)", html);

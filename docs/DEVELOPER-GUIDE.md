@@ -94,6 +94,15 @@ has both `First name` (ticket holder) and `First Name` (attendee).
 | `Post nominal`, `Please specify your post nominal` | no | post nominal (the "specify" answer wins) |
 | `Position title` | no | position |
 
+**Gala RSVP export** (console app only; same parser, `SourceRsvpParser.Parse(stream, galaStream)`). Its tickets
+are added to the RSVP export's before people are grouped, so a person in both files becomes one record and the
+matcher and rules don't know there were two files. Ticket types are "RSVP - Attending" / "RSVP - Not attending"
+(`TicketTypeParser.TryParseGala`), always Grid Gala. Only `Ticket type`, `Order id`, `First name` and `Last name`
+are required (`GalaRequiredHeaders`); every other column above is read when it's there. Its rows are shown as
+`<sheet> (Gala RSVP)` (`GalaSheetSuffix`) and its warnings under the file `Gala`. `WorkbookDetector` tells it apart
+from the RSVP export by its ticket types (`WorkbookKind.GalaSource`). The web app doesn't pass it, so there Grid
+Gala still comes from "Grid Gala attending" tickets in the one export.
+
 **Master list** ([ProcessedGuestListParser.cs](../src/GalaReconciler.Core/Parsing/ProcessedGuestListParser.cs)).
 Only the **first sheet** is read. Headers are matched **ignoring capitals**.
 
@@ -186,7 +195,7 @@ There are four places, one per step:
 | Step | Where | What |
 |---|---|---|
 | Day names in each file | `EventDays.All` ([EventDay.cs](../src/GalaReconciler.Core/Domain/EventDay.cs)) | ticket label, master list header, short label |
-| RSVP ticket → day + answer | [TicketTypeParser.cs](../src/GalaReconciler.Core/Parsing/TicketTypeParser.cs) | `"<day> attending"` / `"<day> not attending"`, built from `EventDays.All` |
+| RSVP ticket → day + answer | [TicketTypeParser.cs](../src/GalaReconciler.Core/Parsing/TicketTypeParser.cs) | `"<day> attending"` / `"<day> not attending"`, built from `EventDays.All`; in the Gala RSVP export, `"RSVP - Attending"` / `"RSVP - Not attending"` (`TryParseGala`) |
 | Master list cell → answer | `ProcessedGuestListParser.TryParseDayCell` | `Y`/`Yes`, `N`/`No`, `1`, blank. Anything else gives a warning and counts as not invited |
 | Which pairs of answers differ | `DatesMismatchRule.Differs` ([DatesMismatchRule.cs](../src/GalaReconciler.Core/Rules/DatesMismatchRule.cs)) | the table in the README's "What is compared" |
 

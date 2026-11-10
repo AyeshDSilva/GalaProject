@@ -8,6 +8,9 @@ public enum WorkbookKind
     Unknown,
     Source,
     Processed,
+
+    /// <summary>The separate Gala RSVP export ("RSVP - Attending" / "RSVP - Not attending").</summary>
+    GalaSource,
 }
 
 /// <summary>
@@ -30,14 +33,38 @@ public static class WorkbookDetector
 
         using (workbook)
         {
-            // Any sheet with the export's ticket columns (matched exactly, like the parser does).
+            // Any sheet with the export's ticket columns (matched exactly, like the parser does). The main export
+            // and the Gala export both have them; the Gala export's ticket types are "RSVP - (Not) attending"
+            // rather than "<day> (not) attending".
+            var isExport = false;
+            int galaTickets = 0, dayTickets = 0;
             foreach (var sheet in workbook.Worksheets.Where(s => s.LastRowUsed() is not null))
             {
                 var map = new HeaderMap(sheet, StringComparison.Ordinal);
-                if (map.Contains(SourceRsvpParser.Headers.TicketType) && map.Contains(SourceRsvpParser.Headers.OrderId))
+                if (map.Find(SourceRsvpParser.Headers.TicketType) is not { } ticketType || !map.Contains(SourceRsvpParser.Headers.OrderId))
                 {
-                    return WorkbookKind.Source;
+                    continue;
                 }
+
+                isExport = true;
+                var lastRow = sheet.LastRowUsed()!.RowNumber();
+                for (var row = 2; row <= lastRow; row++)
+                {
+                    var text = CellText.Read(sheet.Row(row), ticketType);
+                    if (TicketTypeParser.IsGalaRsvp(text))
+                    {
+                        galaTickets++;
+                    }
+                    else if (TicketTypeParser.TryParse(text, out _, out _))
+                    {
+                        dayTickets++;
+                    }
+                }
+            }
+
+            if (isExport)
+            {
+                return galaTickets > dayTickets ? WorkbookKind.GalaSource : WorkbookKind.Source;
             }
 
             // The master list is read from the first sheet only.

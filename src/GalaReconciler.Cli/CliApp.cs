@@ -11,7 +11,7 @@ public static class ExitCodes
     public const int UnexpectedError = 2;
 }
 
-/// <summary>Finds the two files, compares them and saves the Excel report.</summary>
+/// <summary>Finds the three files, compares them and saves the Excel report.</summary>
 public sealed class CliApp(CompareFilesHandler handler, TextWriter output)
 {
     public int Run(CliOptions options, string currentDirectory)
@@ -40,18 +40,21 @@ public sealed class CliApp(CompareFilesHandler handler, TextWriter output)
             output.WriteLine("GALA guest list reconciliation");
             output.WriteLine();
 
-            var inputs = options.SourceFile is not null
-                ? ReadNamedFiles(Path.GetFullPath(options.SourceFile, currentDirectory), Path.GetFullPath(options.ProcessedFile!, currentDirectory))
+            var inputs = options.Files.Count > 0
+                ? ReadNamedFiles(options.Files.Select(f => Path.GetFullPath(f, currentDirectory)).ToList())
                 : FindInFolder(folder);
 
             output.WriteLine($"  Source file:    {inputs.Source.Name}");
+            output.WriteLine($"  Gala file:      {inputs.Gala.Name}");
             output.WriteLine($"  Processed file: {inputs.Processed.Name}");
             output.WriteLine();
             output.WriteLine("Comparing...");
 
             using var source = new MemoryStream(inputs.Source.Contents, writable: false);
+            using var gala = new MemoryStream(inputs.Gala.Contents, writable: false);
             using var processed = new MemoryStream(inputs.Processed.Contents, writable: false);
-            var result = handler.Handle(new CompareFilesRequest(source, inputs.Source.Name, processed, inputs.Processed.Name));
+            var result = handler.Handle(new CompareFilesRequest(
+                source, inputs.Source.Name, processed, inputs.Processed.Name, gala, inputs.Gala.Name));
 
             // Two new files; the originals are only ever read.
             var paths = OutputPaths.For(options.Output, currentDirectory, folder, result.RunAt, inputs.Processed.Name);
@@ -99,13 +102,14 @@ public sealed class CliApp(CompareFilesHandler handler, TextWriter output)
 
     private InputFiles FindInFolder(string folder)
     {
-        output.WriteLine($"Looking for the two files in {folder}");
+        output.WriteLine($"Looking for the three files in {folder}");
         return InputFileFinder.Find(folder);
     }
 
-    private InputFiles ReadNamedFiles(string sourcePath, string processedPath)
+    /// <summary>The three files can be given in any order; each is recognised by its contents.</summary>
+    private static InputFiles ReadNamedFiles(IReadOnlyList<string> paths)
     {
-        foreach (var path in new[] { sourcePath, processedPath })
+        foreach (var path in paths)
         {
             if (!File.Exists(path))
             {
@@ -113,17 +117,24 @@ public sealed class CliApp(CompareFilesHandler handler, TextWriter output)
             }
         }
 
-        var source = InputFile.Read(sourcePath);
-        var processed = InputFile.Read(processedPath);
+        var detected = paths.Select(InputFile.Read).Select(file => (File: file, Kind: file.DetectKind())).ToList();
 
-        // Given the wrong way round? Swap rather than fail with confusing missing-column errors.
-        if (source.DetectKind() == WorkbookKind.Processed && processed.DetectKind() == WorkbookKind.Source)
+        InputFile One(WorkbookKind kind, string what, string recognisedBy)
         {
-            output.WriteLine("The files look like they were given the wrong way round, so they've been swapped.");
-            (source, processed) = (processed, source);
+            var files = detected.Where(d => d.Kind == kind).Select(d => d.File).ToList();
+            return files.Count == 1
+                ? files[0]
+                : throw new InputFileException(
+                    (files.Count == 0
+                        ? $"None of the files given is the {what}."
+                        : $"More than one of the files given looks like the {what}: {string.Join(", ", files.Select(f => f.Name))}.") +
+                    $"\nIt's recognised by its {recognisedBy}.");
         }
 
-        return new InputFiles(source, processed);
+        return new InputFiles(
+            One(WorkbookKind.Source, InputFiles.SourceDescription, InputFiles.SourceRecognisedBy),
+            One(WorkbookKind.GalaSource, InputFiles.GalaDescription, InputFiles.GalaRecognisedBy),
+            One(WorkbookKind.Processed, InputFiles.ProcessedDescription, InputFiles.ProcessedRecognisedBy));
     }
 
     private void WriteSummary(ReconciliationResult result, OutputPaths paths, int highlightedCells)

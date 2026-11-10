@@ -4,17 +4,18 @@ namespace GalaReconciler.Cli;
 public sealed record CliOptions
 {
     public const string Usage = """
-        Usage: GalaReconciler [source.xlsx processed.xlsx] [options]
+        Usage: GalaReconciler [source.xlsx gala.xlsx processed.xlsx] [options]
 
-        Compares the RSVP export (Source) with the master guest list (Processed). Saves the
-        differences to a results workbook and a highlighted copy of the master list; the original
-        files are never changed.
+        Compares the RSVP export (Source) and the Gala RSVP export with the master guest list
+        (Processed). Saves the differences to a results workbook and a highlighted copy of the
+        master list; the original files are never changed.
 
-        With no file names, the folder is searched for the two workbooks and they are told
-        apart by their column headers, so the files can be called anything.
+        With no file names, the folder is searched for the three workbooks and they are told
+        apart by their columns and ticket types, so the files can be called anything (and given
+        in any order).
 
         Options:
-          --folder <folder>   Folder to search for the two files (default: the current folder)
+          --folder <folder>   Folder to search for the three files (default: the current folder)
           --output <file>     Where to save the results (default: "GALA Reconciliation <date> <time>.xlsx"
                               in the folder). The highlighted copy goes next to it. Can also be a folder.
           --strict            Also flag days marked N in the master list that have no ticket in the export
@@ -22,9 +23,8 @@ public sealed record CliOptions
           -h, --help          Show this help
         """;
 
-    public string? SourceFile { get; init; }
-
-    public string? ProcessedFile { get; init; }
+    /// <summary>The three file names given on the command line, in any order (empty to search the folder).</summary>
+    public IReadOnlyList<string> Files { get; init; } = [];
 
     public string? Folder { get; init; }
 
@@ -86,15 +86,14 @@ public sealed record CliOptions
             }
         }
 
-        if (files.Count is not (0 or 2))
+        if (files.Count is not (0 or 3))
         {
-            return new CliOptions { Error = "Give both file names (Source then Processed), or none to search the folder." };
+            return new CliOptions { Error = "Give all three file names (RSVP export, Gala RSVP export and master list, in any order), or none to search the folder." };
         }
 
         return new CliOptions
         {
-            SourceFile = files.Count == 2 ? files[0] : null,
-            ProcessedFile = files.Count == 2 ? files[1] : null,
+            Files = files,
             Folder = folder,
             Output = output,
             StrictNotAttending = strict,

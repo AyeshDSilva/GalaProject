@@ -56,6 +56,11 @@ public static class ExcelReportWriter
         }
 
         Line("Source file", result.SourceFileName);
+        if (result.GalaFileName is not null)
+        {
+            Line("Gala file", result.GalaFileName);
+        }
+
         Line("Processed file", result.ProcessedFileName);
         if (highlightedCopyName is not null)
         {

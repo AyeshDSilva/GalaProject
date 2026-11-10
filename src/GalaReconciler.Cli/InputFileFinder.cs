@@ -22,12 +22,24 @@ public sealed record InputFile(string Path, byte[] Contents)
     }
 }
 
-public sealed record InputFiles(InputFile Source, InputFile Processed);
+/// <param name="Source">The main RSVP export (Thursday to Sunday).</param>
+/// <param name="Gala">The Gala RSVP export ("RSVP - Attending" / "RSVP - Not attending").</param>
+/// <param name="Processed">The master guest list.</param>
+public sealed record InputFiles(InputFile Source, InputFile Gala, InputFile Processed)
+{
+    public const string SourceDescription = "RSVP export (Source file)";
+    public const string GalaDescription = "Gala RSVP export";
+    public const string ProcessedDescription = "master guest list (Processed file)";
+
+    public const string SourceRecognisedBy = "'Ticket type' and 'Order id' columns, with day ticket types such as 'Saturday attending'";
+    public const string GalaRecognisedBy = "'Ticket type' and 'Order id' columns, with the ticket types 'RSVP - Attending' and 'RSVP - Not attending'";
+    public const string ProcessedRecognisedBy = "'Surname', 'Guest Name' and day columns (THURS, FRI, …) on its first sheet";
+}
 
 /// <summary>A problem finding or reading the input files. The message is written for the user.</summary>
 public sealed class InputFileException(string message) : Exception(message);
 
-/// <summary>Finds the RSVP export and the master guest list in a folder by looking at their headers.</summary>
+/// <summary>Finds the RSVP export, the Gala RSVP export and the master guest list in a folder by looking at their contents.</summary>
 public static class InputFileFinder
 {
     /// <summary>Files this app writes start with this; they (and highlighted copies) are skipped when searching.</summary>
@@ -50,17 +62,17 @@ public static class InputFileFinder
         if (candidates.Count == 0)
         {
             throw new InputFileException(
-                $"No .xlsx files found in {folder}.\nPut the RSVP export and the master guest list in this folder and run again.");
+                $"No .xlsx files found in {folder}.\nPut the RSVP export, the Gala RSVP export and the master guest list in this folder and run again.");
         }
 
         var detected = candidates.Select(InputFile.Read).Select(file => (File: file, Kind: file.DetectKind())).ToList();
-        var sources = detected.Where(d => d.Kind == WorkbookKind.Source).Select(d => d.File).ToList();
-        var processed = detected.Where(d => d.Kind == WorkbookKind.Processed).Select(d => d.File).ToList();
+        List<InputFile> Of(WorkbookKind kind) => detected.Where(d => d.Kind == kind).Select(d => d.File).ToList();
         var looked = string.Join(", ", detected.Select(d => d.File.Name));
 
         return new InputFiles(
-            Single(sources, "RSVP export (Source file)", "'Ticket type' and 'Order id' columns", folder, looked),
-            Single(processed, "master guest list (Processed file)", "'Surname', 'Guest Name' and day columns (THURS, FRI, …) on its first sheet", folder, looked));
+            Single(Of(WorkbookKind.Source), InputFiles.SourceDescription, InputFiles.SourceRecognisedBy, folder, looked),
+            Single(Of(WorkbookKind.GalaSource), InputFiles.GalaDescription, InputFiles.GalaRecognisedBy, folder, looked),
+            Single(Of(WorkbookKind.Processed), InputFiles.ProcessedDescription, InputFiles.ProcessedRecognisedBy, folder, looked));
     }
 
     private static InputFile Single(List<InputFile> files, string what, string recognisedBy, string folder, string looked) =>
@@ -71,6 +83,6 @@ public static class InputFileFinder
                 $"Couldn't find the {what} in {folder}.\nLooked at: {looked}.\nIt's recognised by its {recognisedBy}."),
             _ => throw new InputFileException(
                 $"Found more than one {what}: {string.Join(", ", files.Select(f => f.Name))}.\n" +
-                "Move the ones you don't want out of the folder, or give both file names on the command line."),
+                "Move the ones you don't want out of the folder, or give the three file names on the command line."),
         };
 }
