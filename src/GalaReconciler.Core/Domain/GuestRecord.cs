@@ -44,6 +44,15 @@ public sealed class GuestRecord
 
     public HashSet<string> Emails { get; } = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Dietary requirements. From the RSVP exports: every distinct answer across the person's tickets and all their
+    /// dietary columns, split into parts. From the master list: the Dietary cell as written.
+    /// </summary>
+    public List<string> Dietary { get; } = [];
+
+    /// <summary>Accessibility requirements, read the same way as <see cref="Dietary"/>.</summary>
+    public List<string> Accessibility { get; } = [];
+
     public List<RowReference> Rows { get; } = [];
 
     public AttendanceState GetAttendance(EventDay day) =>

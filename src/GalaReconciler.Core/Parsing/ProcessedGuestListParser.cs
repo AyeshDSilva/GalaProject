@@ -35,7 +35,7 @@ public sealed partial class ProcessedGuestListParser
     [
         .. EventDays.All.Select(d => d.ProcessedHeader),
         Headers.Prenom, Headers.FirstName, Headers.Surname, Headers.Postnom, Headers.GuestName, Headers.Position,
-        Headers.Phone, Headers.Email1,
+        Headers.Phone, Headers.Email1, Headers.Dietary, Headers.Accessibility,
     ];
 
     public ParseResult Parse(Stream stream)
@@ -72,6 +72,8 @@ public sealed partial class ProcessedGuestListParser
         var phoneColumn = map.Find(Headers.Phone);
         var email1Column = map.Find(Headers.Email1);
         var email2Column = map.Find(Headers.Email2);
+        var dietaryColumn = map.Find(Headers.Dietary);
+        var accessibilityColumn = map.Find(Headers.Accessibility);
 
         var warnings = new List<ReconciliationWarning>();
         var records = new List<GuestRecord>();
@@ -123,6 +125,17 @@ public sealed partial class ProcessedGuestListParser
             record.Phones.UnionWith(PhoneNormalizer.NormalizeAll(Cell(phoneColumn)));
             record.Emails.UnionWith(EmailNormalizer.NormalizeAll(Cell(email1Column)));
             record.Emails.UnionWith(EmailNormalizer.NormalizeAll(Cell(email2Column)));
+
+            // Kept as written (one entry): the export's requirements are looked for in this text.
+            if (TextNormalizer.Clean(Cell(dietaryColumn)) is { } dietary)
+            {
+                record.Dietary.Add(dietary);
+            }
+
+            if (TextNormalizer.Clean(Cell(accessibilityColumn)) is { } accessibility)
+            {
+                record.Accessibility.Add(accessibility);
+            }
 
             var position = GuestOf().Match(Cell(positionColumn));
             if (position.Success)
@@ -280,6 +293,8 @@ public sealed partial class ProcessedGuestListParser
         target.Title ??= duplicate.Title;
         target.PostNominal ??= duplicate.PostNominal;
         target.Position ??= duplicate.Position;
+        RequirementNormalizer.AddDistinct(target.Dietary, duplicate.Dietary);
+        RequirementNormalizer.AddDistinct(target.Accessibility, duplicate.Accessibility);
         if (target.HostMatchKey is null)
         {
             target.HostMatchKey = duplicate.HostMatchKey;

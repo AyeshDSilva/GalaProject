@@ -176,7 +176,9 @@ public sealed class ExcelReportWriterTests : IDisposable
         Assert.Equal("14", ValueFor("Matched"));
         Assert.Equal("4", ValueFor("Guest not found"));
         Assert.Equal("3", ValueFor("Dates mismatch"));
-        Assert.Equal("13", ValueFor("Total"));
+        Assert.Equal("1", ValueFor("Dietary mismatch"));
+        Assert.Equal("1", ValueFor("Accessibility mismatch"));
+        Assert.Equal("15", ValueFor("Total"));
         Assert.Equal("1", ValueFor("Mobile mismatch"));
         Assert.Equal("1", ValueFor("Position mismatch"));
         Assert.Equal("1", ValueFor("Warnings"));
@@ -190,7 +192,7 @@ public sealed class ExcelReportWriterTests : IDisposable
 
         var table = sheet.Tables.Single();
         Assert.True(table.ShowAutoFilter);
-        Assert.Equal(13, table.DataRange.RowCount());
+        Assert.Equal(15, table.DataRange.RowCount());
         Assert.Equal(
             ["Type", "Guest", "Name in Source", "Guest of", "Details", "Possible match", "Matched by", "Source", "Processed",
              "Thu", "Fri", "Sat", "Sun", "Gala", "Source location", "Processed location"],
@@ -222,8 +224,15 @@ public sealed class ExcelReportWriterTests : IDisposable
         Assert.Equal("Gala: Not attending", tom.Field("Source").GetString());
         Assert.Equal("Gala: Attending", tom.Field("Processed").GetString());
 
-        // Grace is not attending and N: nothing to report.
-        Assert.DoesNotContain(table.DataRange.Rows(), r => r.Field("Guest").GetString() == "Grace Huang");
+        // Grace is not attending and N: no Grid Gala row. Her accessibility requirement is missing from the master list.
+        Assert.DoesNotContain(table.DataRange.Rows(), r => r.Field("Guest").GetString() == "Grace Huang" && r.Field("Type").GetString() == "Dates mismatch");
+        var grace = Row("Grace Huang", "Accessibility mismatch");
+        Assert.Equal("Missing in Processed", grace.Field("Details").GetString());
+        Assert.Equal("Hearing loop", grace.Field("Source").GetString());
+
+        var olivia = Row("Olivia Grant-Taylor", "Dietary mismatch");
+        Assert.Equal("Not in Processed: No dairy", olivia.Field("Details").GetString());
+        Assert.Equal("Gluten-free", olivia.Field("Processed").GetString());
 
         Assert.Equal("Dr", Row("Leilani Fonua", "Title mismatch").Field("Source").GetString());
         Assert.Equal("Director", Row("Henry Walsh", "Position mismatch").Field("Processed").GetString());
@@ -253,7 +262,7 @@ public sealed class CliAppTests : IDisposable
     public void Dispose() => _folder.Dispose();
 
     private int Run(params string[] args) =>
-        new CliApp(TestHandlers.CreateCompareFilesHandler(), _output).Run(CliOptions.Parse(args), _folder.Path);
+        new CliApp(TestHandlers.CreateConsoleCompareFilesHandler(), _output).Run(CliOptions.Parse(args), _folder.Path);
 
     private string[] Reports() =>
         Directory.GetFiles(_folder.Path, $"{InputFileFinder.ReportFilePrefix}*.xlsx").Select(Path.GetFileName).Order().ToArray()!;
@@ -280,11 +289,11 @@ public sealed class CliAppTests : IDisposable
         Assert.Contains("Gala file:      Gala RSVP.xlsx", text);
         Assert.Contains("Processed file: Master list.xlsx", text);
         Assert.Contains(
-            "13 differences: 4 guest not found, 3 dates mismatch, 1 mobile mismatch, 2 email mismatch, 1 title mismatch, 1 post nominal mismatch, 1 position mismatch",
+            "15 differences: 4 guest not found, 3 dates mismatch, 1 mobile mismatch, 2 email mismatch, 1 title mismatch, 1 post nominal mismatch, 1 position mismatch, 1 dietary mismatch, 1 accessibility mismatch",
             text);
         Assert.Contains("Results saved:", text);
         Assert.Contains("Highlighted master list:", text);
-        Assert.Contains("(13 cells highlighted; the original files were not changed)", text);
+        Assert.Contains("(15 cells highlighted; the original files were not changed)", text);
     }
 
     [Fact]
@@ -308,7 +317,7 @@ public sealed class CliAppTests : IDisposable
         var text = _output.ToString();
         Assert.Contains("Source file:    RSVP export.xlsx", text);
         Assert.Contains("Gala file:      Gala RSVP.xlsx", text);
-        Assert.Contains("13 differences", text);
+        Assert.Contains("15 differences", text);
         Assert.True(File.Exists(_folder.File("out.xlsx")));
         Assert.True(File.Exists(_folder.File("out - Master list (highlighted).xlsx")));
     }
@@ -397,8 +406,16 @@ public sealed class ProcessedFileHighlighterTests : IDisposable
         var sheet = workbook.Worksheet(1);
         var yellow = ProcessedFileHighlighter.ChangedFill;
 
-        // Rows: 3 Leilani, 5 Olivia, 7 Ethan, 10 Maeve, 11 Henry, 12 Clara, 14 William, 15 Ruby McIntyre, 17 Tom.
-        Assert.Equal(13, count);
+        // Rows: 3 Leilani, 5 Olivia, 7 Ethan, 10 Maeve, 11 Henry, 12 Clara, 14 William, 15 Ruby McIntyre, 16 Grace, 17 Tom.
+        Assert.Equal(15, count);
+
+        // Dietary and accessibility.
+        Assert.Equal(yellow, Cell(sheet, 5, "Dietary").Style.Fill.BackgroundColor);        // Olivia: "No dairy" missing
+        Assert.Equal(yellow, Cell(sheet, 16, "Accessibility").Style.Fill.BackgroundColor); // Grace: "Hearing loop" missing
+        Assert.False(IsMarked(Cell(sheet, 2, "Dietary")));        // Marco: "Other" + "No shellfish" matches
+        Assert.False(IsMarked(Cell(sheet, 4, "Dietary")));        // Alice: Vegetarian in both
+        Assert.False(IsMarked(Cell(sheet, 11, "Accessibility"))); // Henry: "Yes" + "Wheelchair access" is in his cell
+        Assert.False(IsMarked(Cell(sheet, 8, "Dietary")));        // Luca: his unnamed guest's "Vegan" isn't his
 
         // William's Phone cell has two numbers on separate lines and neither is in the export.
         Assert.Equal(yellow, Cell(sheet, 14, "Phone").Style.Fill.BackgroundColor);

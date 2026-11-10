@@ -6,6 +6,7 @@ Compares the ticketing system's **RSVP export** (Source) with the hand-maintaine
 - which days each person and their guests are invited to and attending (Thu, Fri, Sat, Sun, Grid Gala)
 - mobile numbers and email addresses
 - title, post nominal and position title
+- dietary and accessibility requirements (console app only for now)
 
 It comes in two forms that share the same comparison code:
 
@@ -52,7 +53,7 @@ kept) with every difference marked on its own row:
 
 | Mark | Meaning |
 |---|---|
-| Yellow cell | The value differs from the RSVP export (the Differences sheet in the results gives both values). Marked cells: the day columns, Prenom, Postnom, Position, Phone, Email 1/Email 2. |
+| Yellow cell | The value differs from the RSVP export (the Differences sheet in the results gives both values). Marked cells: the day columns, Prenom, Postnom, Position, Phone, Email 1/Email 2, Dietary, Accessibility. |
 | Red First Name and Surname | The person isn't in the RSVP export (the results give a possible match if there's a similar name). A `guest` in Guest Name (name not known yet) is never reported as missing; it's only compared when the export has an extra ticket for it. |
 
 People only in the RSVP export have no row to mark; they're listed in the results as "Guest not found".
@@ -76,6 +77,15 @@ The **results workbook** has three sheets:
 | Position | Position title | Position (rows saying "Guest of …" are skipped) | different |
 | Mobile | Mobile + Telephone (all of a person's rows) | Phone (several numbers on separate lines are fine) | no number in common (one match is enough) |
 | Email | Email | Email 1 + Email 2 | no address in common (the address in either column is enough) |
+| Dietary *(console app)* | every column with "dietary" in its header, in both exports (e.g. "Dietary requirements" + "Please specify any dietary requirements") | Dietary | a requirement from the exports isn't mentioned in Dietary |
+| Accessibility *(console app)* | every column with "accessibility" in its header, in both exports | Accessibility | a requirement from the exports isn't mentioned in Accessibility |
+
+For dietary and accessibility, all of a person's answers (every ticket, both exports, the drop-down and the
+"Please specify" text) are collected and split on commas, semicolons and line breaks. "Other", "Yes", "None",
+"Nil", "N/A" and similar aren't requirements and are dropped. Each remaining part must appear somewhere in the
+master list's cell, ignoring case, spaces and punctuation ("Gluten free" = "Gluten-free"); extra detail in the master
+list is fine, and nothing in the exports raises nothing. An unnamed guest's extra ticket isn't used, because its
+answers could be the host's or the guest's.
 
 For title, post nominal and position, a blank or `nil` value in the export never raises anything (the
 master list is left as it is), and case, full stops and spacing are ignored (`Mr.` = `Mr`, `O.A.M.` = `OAM`).
@@ -225,7 +235,8 @@ src/GalaReconciler.Core/           the comparison, shared by both apps
   Normalization/                   NameNormalizer, PhoneNormalizer, EmailNormalizer
   Matching/                        GuestMatcher (name, then unique shared email; never phone)
   Rules/                           IDiscrepancyRule + DatesMismatch, MobileNumberMismatch, EmailMismatch,
-                                   and TextMismatchRule (Title, PostNominal, Position)
+                                   TextMismatchRule (Title, PostNominal, Position), and
+                                   RequirementsMismatchRule (Dietary, Accessibility; console app only, AddRequirementChecks)
 
 src/GalaReconciler.Cli/            console app → GalaReconciler.exe
   CliApp.cs                        find files → compare → save report

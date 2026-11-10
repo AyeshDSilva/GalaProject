@@ -69,7 +69,7 @@ public sealed class Run
 
     public List<RunWarning> Warnings { get; set; } = [];
 
-    public int DiscrepancyCount => Enum.GetValues<DiscrepancyType>().Sum(CountOf);
+    public int DiscrepancyCount => ReconciliationResultViewModel.Types.Sum(CountOf);
 
     public int CountOf(DiscrepancyType type) => type switch
     {

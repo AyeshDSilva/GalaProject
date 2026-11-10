@@ -66,9 +66,13 @@ public sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
 
 public static partial class TestHandlers
 {
-    /// <summary>The handler exactly as both apps register it: every rule, default options.</summary>
+    /// <summary>The handler as the web app registers it: the shared rules, default options.</summary>
     public static CompareFilesHandler CreateCompareFilesHandler() =>
         new ServiceCollection().AddComparison().BuildServiceProvider().GetRequiredService<CompareFilesHandler>();
+
+    /// <summary>The handler as the console app registers it: the shared rules plus dietary and accessibility.</summary>
+    public static CompareFilesHandler CreateConsoleCompareFilesHandler() =>
+        new ServiceCollection().AddComparison().AddRequirementChecks().BuildServiceProvider().GetRequiredService<CompareFilesHandler>();
 
     /// <summary>The comparison of the three sample workbooks, as the console app does it.</summary>
     public static ReconciliationResult CompareSamples()
@@ -76,7 +80,7 @@ public static partial class TestHandlers
         using var source = SampleWorkbookBuilder.Source().ToStream();
         using var gala = SampleWorkbookBuilder.Gala().ToStream();
         using var processed = SampleWorkbookBuilder.Processed().ToStream();
-        return CreateCompareFilesHandler().Handle(
+        return CreateConsoleCompareFilesHandler().Handle(
             new CompareFilesRequest(source, "Source.xlsx", processed, "Processed.xlsx", gala, "Gala.xlsx"));
     }
 

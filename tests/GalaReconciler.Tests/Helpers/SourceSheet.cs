@@ -32,6 +32,18 @@ public sealed record SourceTicket(string TicketType, string FirstName, string La
 
     /// <summary>Put a different name in columns B/C than in the attendee section.</summary>
     public (string First, string Last)? TicketHolderName { get; init; }
+
+    /// <summary>The "Dietary requirements" drop-down.</summary>
+    public string? Dietary { get; init; }
+
+    /// <summary>"Please specify any dietary requirements".</summary>
+    public string? DietaryOther { get; init; }
+
+    /// <summary>The "Accessibility requirements" drop-down.</summary>
+    public string? Accessibility { get; init; }
+
+    /// <summary>"Please specify any accessibility requirements".</summary>
+    public string? AccessibilityOther { get; init; }
 }
 
 public static class SourceSheet
@@ -43,13 +55,33 @@ public static class SourceSheet
         "Postal Address suburb", "Postal Address postcode", "Postal Address state", "Postal Address country", "Title",
         "Please specify your title", "First Name", "Last Name", "Post nominal", "Please specify your post nominal",
         "Mobile", "Telephone", "Email", "Position title", "Organisation", "Dietary requirements",
-        "Please specify any dietary requirements",
+        "Please specify any dietary requirements", "Accessibility requirements",
+        "Please specify any accessibility requirements",
     ];
+
+    /// <summary>
+    /// The Gala RSVP export: the same columns, but the dietary and accessibility ones are worded differently
+    /// (they still contain "Dietary" / "Accessibility").
+    /// </summary>
+    public static IReadOnlyList<string> GalaHeaders { get; } = Headers
+        .Select(header => header switch
+        {
+            "Dietary requirements" => "Dietary",
+            "Please specify any dietary requirements" => "Other dietary requirements",
+            "Accessibility requirements" => "Accessibility",
+            "Please specify any accessibility requirements" => "Other accessibility requirements",
+            _ => header,
+        })
+        .ToList();
 
     private static int _ticketNumber = 1000;
 
     public static WorkbookBuilder AddSourceSheet(this WorkbookBuilder builder, string sheetName, params SourceTicket[] tickets) =>
         builder.Sheet(sheetName, Headers, tickets.Select(ToRow));
+
+    /// <summary>A sheet of the Gala RSVP export, with its own wording for the dietary and accessibility columns.</summary>
+    public static WorkbookBuilder AddGalaSheet(this WorkbookBuilder builder, string sheetName, params SourceTicket[] tickets) =>
+        builder.Sheet(sheetName, GalaHeaders, tickets.Select(ToRow));
 
     public static IReadOnlyList<object?> ToRow(SourceTicket ticket)
     {
@@ -85,6 +117,10 @@ public static class SourceSheet
         Set("Telephone", ticket.Telephone);
         Set("Email", ticket.Email);
         Set("Position title", ticket.PositionTitle);
+        Set("Dietary requirements", ticket.Dietary);
+        Set("Please specify any dietary requirements", ticket.DietaryOther);
+        Set("Accessibility requirements", ticket.Accessibility);
+        Set("Please specify any accessibility requirements", ticket.AccessibilityOther);
         return row;
     }
 

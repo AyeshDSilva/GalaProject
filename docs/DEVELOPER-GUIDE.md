@@ -114,9 +114,20 @@ Only the **first sheet** is read. Headers are matched **ignoring capitals**.
 | `Guest Name` | yes | the host's list of guests |
 | `Phone`, `Email 1` | yes | phones, emails |
 | `Email 2` | no | emails |
+| `Dietary`, `Accessibility` | yes | requirements (console app checks only), kept as written |
 
-`Organisation`, `Comments`, `Dietary` and `Accessibility` have constants in `ProcessedGuestListParser.Headers`
-but aren't read yet.
+`Organisation` and `Comments` have constants in `ProcessedGuestListParser.Headers` but aren't read yet.
+
+**Dietary and accessibility.** In both exports, every column whose header contains `dietary` / `accessibility`
+(any case; `SourceRsvpParser.Headers.DietaryWord` / `AccessibilityWord`) is read, because the main export says
+"Dietary requirements" + "Please specify any dietary requirements" and the Gala export words them differently.
+`RequirementNormalizer` splits the answers into parts (commas, semicolons, line breaks; not `/`, which is in "N/A"),
+drops non-answers (`NoRequirement`: "Other", "Yes", … plus `TextNormalizer`'s placeholders) and checks each part is
+mentioned in the master list's cell (`IsCoveredBy`: letters and digits only, lower case). `RequirementsMismatchRule`
+(`DietaryMismatchRule`, `AccessibilityMismatchRule`) flags the parts that aren't. Only the console app registers these
+rules (`AddRequirementChecks` in `Program.cs`); the web app leaves the two types out of its cards and counts
+(`DiscrepancyType.IsConsoleOnly`). To turn them on in the web app: call `AddRequirementChecks` there, add count columns
+to `Run` and a migration (see recipe 6 h), and remove the `IsConsoleOnly` filter.
 
 ## Recipes
 

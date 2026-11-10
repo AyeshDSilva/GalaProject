@@ -49,6 +49,10 @@ public sealed partial class HeaderMap
 
     public bool Contains(string header) => Find(header) is not null;
 
+    /// <summary>Every column whose header contains <paramref name="word"/>, ignoring case, left to right.</summary>
+    public IReadOnlyList<int> FindAllContaining(string word) =>
+        _headers.Where(h => h.Header.Contains(word, StringComparison.OrdinalIgnoreCase)).Select(h => h.Column).ToList();
+
     public IReadOnlyList<string> Missing(IEnumerable<string> required) =>
         required.Where(header => !Contains(header)).ToList();
 

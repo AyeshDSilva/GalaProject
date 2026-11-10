@@ -115,6 +115,14 @@ public static class ProcessedFileHighlighter
             case DiscrepancyType.PositionMismatch:
                 yield return (Headers.Position, ChangedFill, ValuesNote(d, "Position title"));
                 break;
+
+            case DiscrepancyType.DietaryMismatch:
+                yield return (Headers.Dietary, ChangedFill, ValuesNote(d, "Dietary requirements"));
+                break;
+
+            case DiscrepancyType.AccessibilityMismatch:
+                yield return (Headers.Accessibility, ChangedFill, ValuesNote(d, "Accessibility requirements"));
+                break;
         }
     }
 

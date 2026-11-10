@@ -29,4 +29,15 @@ public static class ComparisonServiceCollectionExtensions
         services.AddScoped<CompareFilesHandler>();
         return services;
     }
+
+    /// <summary>
+    /// Dietary and accessibility checks. Only the console app registers these for now (after <see cref="AddComparison"/>);
+    /// the web app's saved runs have no columns for them.
+    /// </summary>
+    public static IServiceCollection AddRequirementChecks(this IServiceCollection services)
+    {
+        services.AddSingleton<IDiscrepancyRule, DietaryMismatchRule>();
+        services.AddSingleton<IDiscrepancyRule, AccessibilityMismatchRule>();
+        return services;
+    }
 }

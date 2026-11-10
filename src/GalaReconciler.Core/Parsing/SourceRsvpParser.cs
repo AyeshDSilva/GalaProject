@@ -41,6 +41,16 @@ public sealed class SourceRsvpParser
         public const string Telephone = "Telephone";
         public const string Email = "Email";
         public const string PositionTitle = "Position title";
+
+        /// <summary>
+        /// Every column whose header contains this word (any case) is read as dietary requirements, e.g.
+        /// "Dietary requirements" and "Please specify any dietary requirements". The Gala export words them
+        /// differently, so they're found by the word rather than the full header.
+        /// </summary>
+        public const string DietaryWord = "dietary";
+
+        /// <summary>As <see cref="DietaryWord"/>, for accessibility requirements.</summary>
+        public const string AccessibilityWord = "accessibility";
     }
 
     private static readonly string[] RequiredHeaders =
@@ -165,7 +175,24 @@ public sealed class SourceRsvpParser
             Mobile: Find(Headers.Mobile, attendeeStart),
             Telephone: Find(Headers.Telephone, attendeeStart),
             Email: Find(Headers.Email, attendeeStart),
-            PositionTitle: map.Find(Headers.PositionTitle));
+            PositionTitle: map.Find(Headers.PositionTitle),
+            Dietary: map.FindAllContaining(Headers.DietaryWord),
+            Accessibility: map.FindAllContaining(Headers.AccessibilityWord));
+    }
+
+    /// <summary>
+    /// All the requirements in a ticket's columns: the drop-down answer and the "Please specify" text, split into
+    /// parts, without "Other", "Yes", "None" and the like, and without repeats.
+    /// </summary>
+    private static List<string> ReadRequirements(IReadOnlyList<int> columns, Func<int?, string> cell)
+    {
+        var parts = new List<string>();
+        foreach (var column in columns)
+        {
+            RequirementNormalizer.AddDistinct(parts, RequirementNormalizer.Parts(cell(column)));
+        }
+
+        return parts;
     }
 
     /// <summary>
@@ -253,7 +280,9 @@ public sealed class SourceRsvpParser
                 state,
                 phones,
                 emails,
-                NameNormalizer.Key(buyerFirst, buyerLast)));
+                NameNormalizer.Key(buyerFirst, buyerLast),
+                ReadRequirements(columns.Dietary, Cell),
+                ReadRequirements(columns.Accessibility, Cell)));
         }
     }
 
@@ -307,6 +336,8 @@ public sealed class SourceRsvpParser
             foreach (var ticket in personTickets)
             {
                 AddContactDetails(record, ticket);
+                RequirementNormalizer.AddDistinct(record.Dietary, ticket.Dietary);
+                RequirementNormalizer.AddDistinct(record.Accessibility, ticket.Accessibility);
                 record.Rows.Add(new RowReference(ticket.Sheet, ticket.Row, NullIfEmpty(ticket.OrderId)));
             }
 
@@ -344,7 +375,8 @@ public sealed class SourceRsvpParser
 
             foreach (var ticket in guestTickets)
             {
-                // The repeated ticket carries the host's own contact details, so they belong to the host.
+                // The repeated ticket carries the host's own contact details, so they belong to the host. Its
+                // dietary and accessibility answers could be the host's or the guest's, so they're not used.
                 AddContactDetails(host, ticket);
                 guest.Rows.Add(new RowReference(ticket.Sheet, ticket.Row, NullIfEmpty(ticket.OrderId)));
             }
@@ -406,7 +438,9 @@ public sealed class SourceRsvpParser
         int? Mobile,
         int? Telephone,
         int? Email,
-        int? PositionTitle);
+        int? PositionTitle,
+        IReadOnlyList<int> Dietary,
+        IReadOnlyList<int> Accessibility);
 
     private sealed record Ticket(
         string Sheet,
@@ -421,5 +455,7 @@ public sealed class SourceRsvpParser
         AttendanceState State,
         IReadOnlyList<string> Phones,
         IReadOnlyList<string> Emails,
-        string BuyerMatchKey);
+        string BuyerMatchKey,
+        IReadOnlyList<string> Dietary,
+        IReadOnlyList<string> Accessibility);
 }

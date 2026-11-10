@@ -99,3 +99,41 @@ public class EmailNormalizerTests
             ["a@x.com", "b@x.com", "c@x.com", "d@x.com"],
             EmailNormalizer.NormalizeAll("a@x.com\nb@x.com, c@x.com; d@x.com nil"));
 }
+
+public class RequirementNormalizerTests
+{
+    [Theory]
+    [InlineData("Vegetarian", new[] { "Vegetarian" })]
+    [InlineData("Gluten free, no dairy", new[] { "Gluten free", "no dairy" })]
+    [InlineData("Vegan; nut allergy\nno shellfish", new[] { "Vegan", "nut allergy", "no shellfish" })]
+    [InlineData("Halal / Kosher", new[] { "Halal / Kosher" })]
+    [InlineData("Other", new string[0])]
+    [InlineData("Other (please specify)", new string[0])]
+    [InlineData("Yes", new string[0])]
+    [InlineData("None", new string[0])]
+    [InlineData("nil", new string[0])]
+    [InlineData("N/A", new string[0])]
+    [InlineData("No dietary requirements", new string[0])]
+    [InlineData("-", new string[0])]
+    [InlineData("", new string[0])]
+    public void Splits_answers_and_drops_ones_that_are_not_requirements(string cell, string[] expected) =>
+        Assert.Equal(expected, RequirementNormalizer.Parts(cell));
+
+    [Theory]
+    [InlineData("Gluten free", "Gluten-free", true)]
+    [InlineData("gluten free", "Vegetarian, GLUTEN FREE.", true)]
+    [InlineData("Wheelchair access", "Wheelchair access, aisle seat", true)]
+    [InlineData("No dairy", "Gluten-free", false)]
+    [InlineData("Coeliac", "Gluten free", false)]
+    [InlineData("Vegan", null, false)]
+    public void A_requirement_is_covered_when_the_master_list_mentions_it(string part, string? processed, bool covered) =>
+        Assert.Equal(covered, RequirementNormalizer.IsCoveredBy(part, processed));
+
+    [Fact]
+    public void Adds_each_requirement_once()
+    {
+        var parts = new List<string> { "Gluten free" };
+        RequirementNormalizer.AddDistinct(parts, ["gluten-free", "No dairy", "no dairy"]);
+        Assert.Equal(["Gluten free", "No dairy"], parts);
+    }
+}

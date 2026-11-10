@@ -284,4 +284,48 @@ public class SourceRsvpParserTests
         Assert.Equal(SourceRsvpParser.GalaFileLabel, ex.FileLabel);
         Assert.Equal(["Last name"], ex.MissingHeaders);
     }
+
+    [Fact]
+    public void Reads_both_dietary_and_both_accessibility_columns()
+    {
+        var result = Parse(new SourceTicket("Saturday attending", "Marco", "Bellini")
+        {
+            Dietary = "Gluten free", DietaryOther = "No dairy, gluten-free",
+            Accessibility = "Yes", AccessibilityOther = "Wheelchair access",
+        });
+
+        var marco = Single(result, "Marco Bellini");
+        Assert.Equal(["Gluten free", "No dairy"], marco.Dietary);
+        Assert.Equal(["Wheelchair access"], marco.Accessibility);
+    }
+
+    [Fact]
+    public void Collects_requirements_from_every_ticket_in_both_exports()
+    {
+        var result = ParseWithGala(
+            new WorkbookBuilder().AddSourceSheet("RSVP",
+                new SourceTicket("Friday attending", "Marco", "Bellini", "O1") { Dietary = "Vegetarian" },
+                new SourceTicket("Saturday attending", "Marco", "Bellini", "O1") { Dietary = "Vegetarian" }),
+            new WorkbookBuilder().AddGalaSheet("attendee-report",
+                new SourceTicket("RSVP - Attending", "Marco", "Bellini", "G1") { DietaryOther = "No mushrooms", AccessibilityOther = "Hearing loop" }));
+
+        var marco = Single(result, "Marco Bellini");
+        Assert.Equal(["Vegetarian", "No mushrooms"], marco.Dietary);
+        Assert.Equal(["Hearing loop"], marco.Accessibility);
+    }
+
+    [Fact]
+    public void Finds_requirement_columns_by_the_word_in_their_header()
+    {
+        var gala = new WorkbookBuilder().Sheet(
+            "attendee-report",
+            ["First name", "Last name", "Ticket type", "Order id", "Any DIETARY needs?", "Accessibility - details"],
+            [["Ben", "Edwards", "RSVP - Attending", "J4G7A2KX", "Vegan", "Ramp access"]]);
+
+        var result = ParseWithGala(new WorkbookBuilder().AddSourceSheet("RSVP", new SourceTicket("Friday attending", "Sam", "Fletcher")), gala);
+
+        var ben = Single(result, "Ben Edwards");
+        Assert.Equal(["Vegan"], ben.Dietary);
+        Assert.Equal(["Ramp access"], ben.Accessibility);
+    }
 }

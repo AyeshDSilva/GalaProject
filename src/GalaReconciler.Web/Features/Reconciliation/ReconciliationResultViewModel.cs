@@ -5,7 +5,9 @@ namespace GalaReconciler.Web.Features.Reconciliation;
 
 public sealed class ReconciliationResultViewModel(Guid runId, ReconciliationResult result)
 {
-    public static IReadOnlyList<DiscrepancyType> Types { get; } = Enum.GetValues<DiscrepancyType>();
+    /// <summary>The types the web app checks (dietary and accessibility are console-only for now).</summary>
+    public static IReadOnlyList<DiscrepancyType> Types { get; } =
+        Enum.GetValues<DiscrepancyType>().Where(t => !t.IsConsoleOnly()).ToList();
 
     public Guid RunId { get; } = runId;
 

@@ -12,6 +12,7 @@ internal static partial class Program
 
         using var services = new ServiceCollection()
             .AddComparison()
+            .AddRequirementChecks()
             .Configure<ComparisonOptions>(o => o.StrictNotAttending = options.StrictNotAttending)
             .BuildServiceProvider();
         using var scope = services.CreateScope();

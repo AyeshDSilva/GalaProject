@@ -60,9 +60,11 @@ public class CompareFilesHandlerTests
     public void Alice_has_no_discrepancies() => Assert.Empty(For("Alice Romano"));
 
     [Fact]
-    public void Olivia_matches_by_name_with_an_email_and_a_post_nominal_mismatch()
+    public void Olivia_matches_by_name_with_an_email_a_post_nominal_and_a_dietary_mismatch()
     {
-        Assert.Equal([DiscrepancyType.EmailMismatch, DiscrepancyType.PostNominalMismatch], TypesFor("Olivia Grant-Taylor"));
+        Assert.Equal(
+            [DiscrepancyType.EmailMismatch, DiscrepancyType.PostNominalMismatch, DiscrepancyType.DietaryMismatch],
+            TypesFor("Olivia Grant-Taylor"));
 
         var email = For("Olivia Grant-Taylor").Single(d => d.Type == DiscrepancyType.EmailMismatch);
         Assert.Equal(MatchMethod.Name, email.MatchedBy);
@@ -112,8 +114,59 @@ public class CompareFilesHandlerTests
         Assert.Equal(AttendanceState.NotAttending, gala.Source);
         Assert.Equal(AttendanceState.Attending, gala.Processed);
 
-        // Grace: "RSVP - Not attending" and N.
-        Assert.Empty(For("Grace Huang"));
+        // Grace: "RSVP - Not attending" and N (her only difference is accessibility).
+        Assert.DoesNotContain(For("Grace Huang"), d => d.Type == DiscrepancyType.DatesMismatch);
+    }
+
+    [Fact]
+    public void Dietary_drop_down_and_please_specify_are_both_looked_for_in_the_master_list()
+    {
+        // Olivia: "Gluten free" + "No dairy"; the master list has only "Gluten-free".
+        var dietary = For("Olivia Grant-Taylor").Single(d => d.Type == DiscrepancyType.DietaryMismatch);
+        Assert.Equal("Not in Processed: No dairy", dietary.Detail);
+        Assert.Equal("Gluten free\nNo dairy", dietary.SourceValue);
+        Assert.Equal("Gluten-free", dietary.ProcessedValue);
+
+        // Marco: "Other" + "No shellfish"; "Other" isn't a requirement and the master list has "No shellfish".
+        Assert.Empty(For("Marco Bellini"));
+
+        // Alice: "Vegetarian" in both. Ethan: "None" / "No" aren't requirements.
+        Assert.Empty(For("Alice Romano"));
+        Assert.DoesNotContain(For("Ethan Cole"), d => d.Type is DiscrepancyType.DietaryMismatch or DiscrepancyType.AccessibilityMismatch);
+    }
+
+    [Fact]
+    public void Accessibility_from_the_gala_exports_differently_named_columns()
+    {
+        // Grace's "Other accessibility requirements" (Gala export) isn't in the master list at all.
+        var accessibility = Assert.Single(For("Grace Huang"));
+        Assert.Equal(DiscrepancyType.AccessibilityMismatch, accessibility.Type);
+        Assert.Equal("Missing in Processed", accessibility.Detail);
+        Assert.Equal("Hearing loop", accessibility.SourceValue);
+        Assert.Null(accessibility.ProcessedValue);
+
+        // Henry: "Yes" + "Wheelchair access"; the master list says "Wheelchair access, aisle seat" (extra detail is fine).
+        Assert.DoesNotContain(For("Henry Walsh"), d => d.Type == DiscrepancyType.AccessibilityMismatch);
+    }
+
+    [Fact]
+    public void An_unnamed_guests_dietary_answer_is_not_put_on_the_host()
+    {
+        // Luca's second ticket (his unnamed guest) says "Vegan"; his own row has no dietary requirement.
+        Assert.Empty(For("Luca Di Marco"));
+        Assert.Empty(For("Unnamed guest of Luca Di Marco"));
+    }
+
+    [Fact]
+    public void The_web_registration_does_not_check_dietary_or_accessibility()
+    {
+        using var source = SampleWorkbookBuilder.Source().ToStream();
+        using var gala = SampleWorkbookBuilder.Gala().ToStream();
+        using var processed = SampleWorkbookBuilder.Processed().ToStream();
+
+        var result = TestHandlers.CreateCompareFilesHandler().Handle(new CompareFilesRequest(source, "s", processed, "p", gala, "g"));
+
+        Assert.DoesNotContain(result.Discrepancies, d => d.Type.IsConsoleOnly());
     }
 
     [Fact]
@@ -224,7 +277,7 @@ public class CompareFilesHandlerTests
     [Fact]
     public void Totals_and_ordering()
     {
-        Assert.Equal(13, Result.Discrepancies.Count);
+        Assert.Equal(15, Result.Discrepancies.Count);
         Assert.Equal(16, Result.SourceGuestCount);    // both exports together
         Assert.Equal(17, Result.ProcessedGuestCount); // including Ethan's and Luca's unnamed guests
         Assert.Equal(14, Result.MatchedCount);
@@ -234,8 +287,8 @@ public class CompareFilesHandlerTests
         // would be, Maeve where Oscar Reid would be), then by type.
         Assert.Equal(
             [
-                "Ethan Cole", "Henry Walsh", "Clara Walsh", "Leilani Fonua", "Olivia Grant-Taylor", "Olivia Grant-Taylor",
-                "Maeve O'Connell", "Ruby Macintyre", "Ruby McIntyre", "Sam Fletcher", "Tom Baker", "William Hartley", "William Hartley",
+                "Ethan Cole", "Grace Huang", "Henry Walsh", "Clara Walsh", "Leilani Fonua",
+                "Olivia Grant-Taylor", "Olivia Grant-Taylor", "Olivia Grant-Taylor", "Maeve O'Connell", "Ruby Macintyre", "Ruby McIntyre", "Sam Fletcher", "Tom Baker", "William Hartley", "William Hartley",
             ],
             Result.Discrepancies.Select(d => d.GuestDisplayName));
     }

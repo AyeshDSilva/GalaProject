@@ -21,7 +21,7 @@ public static class SampleWorkbookBuilder
 
     /// <summary>The separate Gala RSVP export.</summary>
     public static WorkbookBuilder Gala() => new WorkbookBuilder()
-        .AddSourceSheet(GalaSheet, GalaTickets("RSVP - Attending", "RSVP - Not attending"));
+        .AddGalaSheet(GalaSheet, GalaTickets("RSVP - Attending", "RSVP - Not attending"));
 
     /// <summary>One export holding the days and Grid Gala ("Grid Gala attending"), as the web app reads it.</summary>
     public static WorkbookBuilder SingleExportSource() => new WorkbookBuilder()
@@ -41,30 +41,33 @@ public static class SampleWorkbookBuilder
             Leilani("Saturday attending", "0491570158"),
             Marco("Sunday attending", "049157156"),
             Leilani("Sunday attending", "0491570157"),
-            // Row 10: identical in both files ("Ms." and "Ms" count as the same title).
+            // Row 10: identical in both files ("Ms." and "Ms" count as the same title; Vegetarian in both).
             new SourceTicket("Saturday attending", "Alice", "Romano", "K3LMP9QA")
             {
-                Title = "Ms.", Mobile = "0491570159", Email = "alice.romano@example.com",
+                Title = "Ms.", Mobile = "0491570159", Email = "alice.romano@example.com", Dietary = "Vegetarian",
             },
             // Row 11: "Grant Taylor" vs "Grant-Taylor"; different email; post nominal from "Please specify" (OAM) vs AM.
+            // Dietary: "Gluten free" is in the master list ("Gluten-free"), but "no dairy" isn't.
             new SourceTicket("Saturday attending", "Olivia", "Grant Taylor", "Q8WTR2ZN")
             {
                 Title = "Ms", PostNominal = "Other", PostNominalOther = "OAM", Mobile = "0491570110", Email = "olivia.grant@example.com",
+                Dietary = "Gluten free", DietaryOther = "No dairy",
             },
-            // Row 12: bought by an assistant; buyer contact details must not be used.
+            // Row 12: bought by an assistant; buyer contact details must not be used. "None" and "No" aren't requirements.
             new SourceTicket("Saturday not attending", "Ethan", "Cole", "MH4421XP")
             {
                 Title = "Mr", BuyerFirstName = "Nina", BuyerLastName = "Patel",
-                BuyerMobile = "0491 575 789", BuyerEmail = "nina.patel@example.net",
+                BuyerMobile = "0491 575 789", BuyerEmail = "nina.patel@example.net", Dietary = "None", Accessibility = "No",
             },
-            // Rows 13-14: two Sunday tickets on one order under one name = Luca + an unnamed guest.
+            // Rows 13-14: two Sunday tickets on one order under one name = Luca + an unnamed guest. The second ticket's
+            // dietary answer could be Luca's or his guest's, so it isn't compared with Luca's row.
             new SourceTicket("Sunday not attending", "Luca", "Di Marco", "ZK4W8NPL")
             {
                 Title = "Mr", Telephone = "0491 574 118", Email = "luca.dimarco@example.com",
             },
             new SourceTicket("Sunday not attending", "Luca", "Di Marco", "ZK4W8NPL")
             {
-                Title = "Mr", Telephone = "0491 574 118", Email = "luca.dimarco@example.com",
+                Title = "Mr", Telephone = "0491 574 118", Email = "luca.dimarco@example.com", Dietary = "Vegan",
             },
             // Rows 15-16: not in Processed; the second ticket type is unrecognised (warning).
             new SourceTicket("Friday not attending", "Sam", "Fletcher", "CS19PLMQ")
@@ -99,9 +102,11 @@ public static class SampleWorkbookBuilder
                 Title = "Mr", Mobile = "0491570737", Telephone = "(08) 7010 0175", Email = "oscar.reid@example.com", PositionTitle = "nil",
             },
             // Three people sharing one phone number; Clara and Felix are Henry's guests. Henry's position title differs.
+            // Henry's accessibility: "Yes" plus the detail in the "Other" column, which matches the master list.
             new SourceTicket(attending, "Henry", "Walsh", "GG20TS02")
             {
                 Title = "Mr", Telephone = "0491 571 266", Email = "henry.walsh@example.com", PositionTitle = "Managing Director",
+                Accessibility = "Yes", AccessibilityOther = "Wheelchair access",
             },
             new SourceTicket(attending, "Clara", "Walsh", "GG20TS02")
             {
@@ -111,10 +116,11 @@ public static class SampleWorkbookBuilder
             {
                 Title = "Mr", Telephone = "0491 571 266", BuyerFirstName = "Henry", BuyerLastName = "Walsh",
             },
-            // Not attending, and N in the master list: no difference.
+            // Not attending, and N in the master list: no Grid Gala difference. Her accessibility requirement isn't
+            // in the master list at all.
             new SourceTicket(notAttending, "Grace", "Huang", "GG30HN03")
             {
-                Title = "Ms", Mobile = "0491 573 330", Email = "grace.huang@example.com",
+                Title = "Ms", Mobile = "0491 573 330", Email = "grace.huang@example.com", AccessibilityOther = "Hearing loop",
             },
             // Not attending, but still Y in the master list: Grid Gala differs.
             new SourceTicket(notAttending, "Tom", "Baker", "GG40TB04")
@@ -130,7 +136,7 @@ public static class SampleWorkbookBuilder
             {
                 Prenom = "Mr", Thurs = "Y", Fri = "Y", Sat = "Y", Sun = "Y", GuestName = "Ms Leilani Fonua",
                 Position = "Managing Director", Organisation = "Bellini Group", Phone = "0491 570 156",
-                Email1 = "marco.bellini@example.com",
+                Email1 = "marco.bellini@example.com", Dietary = "No shellfish",
             },
             new ProcessedGuest("Leilani", "Fonua") // row 3
             {
@@ -144,6 +150,7 @@ public static class SampleWorkbookBuilder
             new ProcessedGuest("Olivia", "Grant-Taylor") // row 5: phone is a numeric cell; post nominal AM vs OAM in the export
             {
                 Prenom = "Ms", Postnom = "AM", Sat = "Y", Organisation = "Harbour City FC", Phone = 491570110, Email1 = "ogrant@example.org",
+                Dietary = "Gluten-free",
             },
             null, // row 6: blank
             // row 7: Grid Gala 1 = invited, no response; he has no Gala ticket, so that matches. His "guest" has no
@@ -171,7 +178,7 @@ public static class SampleWorkbookBuilder
             new ProcessedGuest("Henry", "Walsh") // row 11: multi-line Guest Name; position "Director" vs "Managing Director"
             {
                 Prenom = "Mr", GridGala = "Y", GuestName = "Mrs Clara Walsh\nMr Felix Moreau", Position = "Director", Phone = "0491 571 266",
-                Email1 = "henry.walsh@example.com",
+                Email1 = "henry.walsh@example.com", Accessibility = "Wheelchair access, aisle seat",
             },
             new ProcessedGuest("Clara", "Walsh") // row 12: Grid Gala 1 (no response yet), but she is attending in the export
             {
@@ -210,7 +217,9 @@ public static class SampleWorkbookBuilder
     private static SourceTicket Marco(string ticketType, object telephone) =>
         new(ticketType, "Marco", "Bellini", "Q7RT2MXA")
         {
+            // Dietary "Other" only means the detail is in "Please specify"; the master list has it.
             Title = "Mr", PositionTitle = "Managing Director", Telephone = telephone, Email = "marco.bellini@example.com",
+            Dietary = "Other", DietaryOther = "No shellfish",
         };
 
     private static SourceTicket Leilani(string ticketType, object telephone) =>

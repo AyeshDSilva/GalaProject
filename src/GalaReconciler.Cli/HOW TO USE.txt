@@ -65,6 +65,11 @@ Phone      One number in common is enough. The Phone cell can hold several numbe
            are ignored.
 Email      One address in common is enough: if the RSVP export's email is in either Email 1 or
            Email 2, it is not highlighted.
+Dietary /  Every dietary (or accessibility) answer the guest gave in either RSVP export, both the
+Accessibility  drop-down and the "Please specify" text, must be mentioned in the master list's Dietary
+           (or Accessibility) cell. Capitals, spaces and punctuation don't count ("Gluten free" is the
+           same as "Gluten-free"), and extra detail in the master list is fine. "Other", "Yes", "None",
+           "Nil" and "N/A" aren't requirements. A blank answer in the export never highlights anything.
 
 For title, post nominal and position: if the RSVP export is blank or says "nil", the master list is
 left alone. Capitals, full stops and spacing don't count ("Mr." is the same as "Mr"), and the titles
