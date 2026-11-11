@@ -1,5 +1,6 @@
 using ClosedXML.Excel;
 using GalaReconciler.Core.Domain;
+using GalaReconciler.Core.Matching;
 using GalaReconciler.Core.Normalization;
 
 namespace GalaReconciler.Core.Parsing;
@@ -282,12 +283,62 @@ public sealed class SourceRsvpParser
                 emails,
                 NameNormalizer.Key(buyerFirst, buyerLast),
                 ReadRequirements(columns.Dietary, Cell),
-                ReadRequirements(columns.Accessibility, Cell)));
+                ReadRequirements(columns.Accessibility, Cell),
+                NameNormalizer.Key(Cell(columns.FirstName), Cell(columns.LastName)),
+                file == GalaExport));
         }
     }
 
-    private static List<GuestRecord> BuildRecords(List<Ticket> tickets, List<ReconciliationWarning> warnings)
+    /// <summary>
+    /// The same person can be spelled differently in the two exports, which would make them two people, and the
+    /// spelling that doesn't match the master list would be reported as not found. Gala tickets join the main
+    /// export's person when they share an email and the names are nearly the same. Both conditions matter: couples
+    /// often share an email, so an email alone isn't enough.
+    /// </summary>
+    private static List<Ticket> UnifySpellingsAcrossExports(List<Ticket> tickets, List<ReconciliationWarning> warnings)
     {
+        var main = tickets.Where(t => !t.FromGala).GroupBy(t => t.MatchKey).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+        var gala = tickets.Where(t => t.FromGala).GroupBy(t => t.MatchKey).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+        var renames = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (var (galaKey, galaTickets) in gala.Where(g => !main.ContainsKey(g.Key)))
+        {
+            var emails = galaTickets.SelectMany(t => t.Emails).ToHashSet(StringComparer.Ordinal);
+            var candidates = main
+                .Where(m => !gala.ContainsKey(m.Key)
+                    && !renames.ContainsValue(m.Key)
+                    && GuestMatcher.IsSimilarName(galaKey, m.Key)
+                    && m.Value.Any(t => t.Emails.Any(emails.Contains)))
+                .Select(m => m.Key)
+                .ToList();
+
+            if (candidates.Count == 1)
+            {
+                renames[galaKey] = candidates[0];
+                warnings.Add(new(GalaWarningFile, $"{galaTickets[0].DisplayName} in the Gala RSVP export and {main[candidates[0]][0].DisplayName} in the RSVP export have the same email and nearly the same name, so they were treated as one person."));
+            }
+        }
+
+        if (renames.Count == 0)
+        {
+            return tickets;
+        }
+
+        return tickets
+            .Select(t => t with
+            {
+                MatchKey = renames.GetValueOrDefault(t.MatchKey, t.MatchKey),
+                DisplayName = renames.TryGetValue(t.MatchKey, out var key) ? main[key][0].DisplayName : t.DisplayName,
+                BuyerMatchKey = renames.GetValueOrDefault(t.BuyerMatchKey, t.BuyerMatchKey),
+                SpelledAs = renames.ContainsKey(t.MatchKey) ? t.MatchKey : null,
+            })
+            .ToList();
+    }
+
+    private static List<GuestRecord> BuildRecords(List<Ticket> allTickets, List<ReconciliationWarning> warnings)
+    {
+        var tickets = UnifySpellingsAcrossExports(allTickets, warnings);
+
         // A second ticket for the same day, on the same order, under the same attendee name is an
         // unnamed guest of that attendee. The first such ticket stays with the attendee.
         var ownTickets = new List<Ticket>();
@@ -338,6 +389,8 @@ public sealed class SourceRsvpParser
                 AddContactDetails(record, ticket);
                 RequirementNormalizer.AddDistinct(record.Dietary, ticket.Dietary);
                 RequirementNormalizer.AddDistinct(record.Accessibility, ticket.Accessibility);
+                record.OtherMatchKeys.UnionWith(
+                    new[] { ticket.HolderMatchKey, ticket.SpelledAs }.OfType<string>().Where(key => key.Length > 0 && key != group.Key));
                 record.Rows.Add(new RowReference(ticket.Sheet, ticket.Row, NullIfEmpty(ticket.OrderId)));
             }
 
@@ -457,5 +510,8 @@ public sealed class SourceRsvpParser
         IReadOnlyList<string> Emails,
         string BuyerMatchKey,
         IReadOnlyList<string> Dietary,
-        IReadOnlyList<string> Accessibility);
+        IReadOnlyList<string> Accessibility,
+        string HolderMatchKey,
+        bool FromGala,
+        string? SpelledAs = null);
 }

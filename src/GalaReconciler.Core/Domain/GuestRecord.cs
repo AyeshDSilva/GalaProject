@@ -31,6 +31,12 @@ public sealed class GuestRecord
     /// <summary>Normalized "first last", see <c>NameNormalizer</c>.</summary>
     public required string MatchKey { get; init; }
 
+    /// <summary>
+    /// Other normalized names the export has for this person: the ticket holder name in columns B/C when it
+    /// differs from the attendee name, and a different spelling in the other export. Tried after exact names.
+    /// </summary>
+    public HashSet<string> OtherMatchKeys { get; } = new(StringComparer.Ordinal);
+
     /// <summary>Who this person is a guest of, if anyone.</summary>
     public string? HostDisplayName { get; set; }
 

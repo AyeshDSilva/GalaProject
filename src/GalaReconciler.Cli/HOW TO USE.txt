@@ -41,8 +41,8 @@ It is your master list exactly as it was, with:
   Red names      First Name and Surname of people who are not in the RSVP export at all.
                  A "guest" in the Guest Name column (name not known yet) is never marked as missing.
 
-People who are only in the RSVP export can't be highlighted here (they have no row); they are listed in
-the results workbook as "Guest not found".
+People who are only in the RSVP exports can't be highlighted here (they have no row); they are listed in
+the results workbook as "Guest not found". The Details column says which export they were found in.
 
 
 What is compared

@@ -142,7 +142,12 @@ public static class ExcelReportWriter
             sheet.Cell(row, 4).Value = d.HostDisplayName ?? "";
             sheet.Cell(row, 5).Value = d.Detail;
             sheet.Cell(row, 6).Value = d.PossibleMatch ?? "";
-            sheet.Cell(row, 7).Value = d.MatchedBy == MatchMethod.Email ? "Email" : "";
+            sheet.Cell(row, 7).Value = d.MatchedBy switch
+            {
+                MatchMethod.Email => "Email",
+                MatchMethod.GuestOfHost => "Guest of host",
+                _ => "",
+            };
             sheet.Cell(row, 8).Value = d.SourceValue ?? "";
             sheet.Cell(row, 9).Value = d.ProcessedValue ?? "";
 

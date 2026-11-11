@@ -17,6 +17,12 @@ public abstract class SetMismatchRule : IDiscrepancyRule
 
     public Discrepancy? Evaluate(MatchedPair pair)
     {
+        // An extra ticket carries the host's contact details, so there's nothing of the guest's to compare.
+        if (pair.Source.IsUnnamedGuest)
+        {
+            return null;
+        }
+
         var source = SelectValues(pair.Source);
         var processed = SelectValues(pair.Processed);
 

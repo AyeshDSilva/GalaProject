@@ -311,11 +311,20 @@ place your new type probably needs a line too.
 
 1. **Name**: the normalized "first last" key (`NameNormalizer.Key`). Changing how names are normalized changes
    matching too.
-2. **Email**: only when exactly one unmatched person on each side shares the address.
-3. **Leftovers** are "Guest not found". A name within `PossibleMatchMaxDistance` (2) letters on the other side is
+2. **Other names** (`GuestRecord.OtherMatchKeys`): the ticket holder name in columns B/C when it differs from the
+   attendee name, and the other export's spelling. Runs after step 1 so an exact name always wins.
+3. **Email**: only when exactly one unmatched person on each side shares the address.
+4. **Extra tickets** (`MatchMethod.GuestOfHost`): an "Unnamed guest of X" from the export pairs with a guest the master
+   list names for X who has no ticket of their own. Phones and emails aren't compared for these pairs, since the ticket
+   carries the host's details.
+5. **Leftovers** are "Guest not found". A name within `PossibleMatchMaxDistance` (2) letters on the other side is
    suggested, never matched.
 
-Phones are deliberately never used to match, because people share numbers. Add new matching steps between 2 and 3,
+Before matching, `SourceRsvpParser.UnifySpellingsAcrossExports` joins a Gala export person to the main export's when they
+share an email and `GuestMatcher.IsSimilarName` says the names are nearly the same (a shared email alone could be a
+couple). Each join adds a warning.
+
+Phones are deliberately never used to match, because people share numbers. Add new matching steps before the leftovers,
 and keep the "exactly one on each side" safeguard so one shared value can't pair the wrong people.
 
 ### 8. Add a warning

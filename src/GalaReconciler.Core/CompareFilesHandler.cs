@@ -62,10 +62,11 @@ public sealed class CompareFilesHandler(
 
         // Unmatched records only ever produce GuestNotFound. A "guest" in the master list's Guest Name column
         // (name not known yet) isn't reported when the export has no partner for it.
-        items.AddRange(match.OnlyInSource.Select(u => (NotFound(u, inSource: true), SortKey.For(u.Record))));
+        var twoExports = request.GalaFile is not null;
+        items.AddRange(match.OnlyInSource.Select(u => (NotFound(u, inSource: true, twoExports), SortKey.For(u.Record))));
         items.AddRange(match.OnlyInProcessed
             .Where(u => !u.Record.IsUnnamedGuest)
-            .Select(u => (NotFound(u, inSource: false), SortKey.For(u.Record))));
+            .Select(u => (NotFound(u, inSource: false, twoExports), SortKey.For(u.Record))));
 
         var ordered = items
             .OrderBy(i => i.Sort.Group, StringComparer.Ordinal)
@@ -88,7 +89,27 @@ public sealed class CompareFilesHandler(
             request.GalaFile is null ? null : request.GalaFileName);
     }
 
-    private static Discrepancy NotFound(UnmatchedGuest unmatched, bool inSource)
+    /// <summary>With two exports, "Source" alone doesn't say where someone was found, so name the file.</summary>
+    private static string NotFoundDetail(GuestRecord record, bool inSource, bool twoExports)
+    {
+        if (!twoExports)
+        {
+            return inSource ? "Only in Source" : "Only in Processed";
+        }
+
+        if (!inSource)
+        {
+            return "Not in either RSVP export";
+        }
+
+        var inGala = record.Rows.Any(r => r.SheetName.EndsWith(SourceRsvpParser.GalaSheetSuffix, StringComparison.Ordinal));
+        var inMain = record.Rows.Any(r => !r.SheetName.EndsWith(SourceRsvpParser.GalaSheetSuffix, StringComparison.Ordinal));
+        return inGala && inMain ? "In both RSVP exports, not in the master list"
+            : inGala ? "Only in Gala RSVP export"
+            : "Only in RSVP export";
+    }
+
+    private static Discrepancy NotFound(UnmatchedGuest unmatched, bool inSource, bool twoExports)
     {
         var record = unmatched.Record;
         return new Discrepancy
@@ -96,7 +117,7 @@ public sealed class CompareFilesHandler(
             Type = DiscrepancyType.GuestNotFound,
             GuestDisplayName = record.DisplayName,
             HostDisplayName = record.HostDisplayName,
-            Detail = inSource ? "Only in Source" : "Only in Processed",
+            Detail = NotFoundDetail(record, inSource, twoExports),
             PossibleMatch = unmatched.PossibleMatch,
             SourceValue = inSource ? record.DescribeAttendance() : null,
             ProcessedValue = inSource ? null : record.DescribeAttendance(),

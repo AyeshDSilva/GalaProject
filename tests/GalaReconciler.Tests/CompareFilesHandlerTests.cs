@@ -228,7 +228,7 @@ public class CompareFilesHandlerTests
     {
         var discrepancy = Assert.Single(For("Sam Fletcher"));
         Assert.Equal(DiscrepancyType.GuestNotFound, discrepancy.Type);
-        Assert.Equal("Only in Source", discrepancy.Detail);
+        Assert.Equal("Only in RSVP export", discrepancy.Detail);
     }
 
     [Fact]
@@ -236,7 +236,7 @@ public class CompareFilesHandlerTests
     {
         var discrepancy = Assert.Single(For("Maeve O'Connell"));
         Assert.Equal(DiscrepancyType.GuestNotFound, discrepancy.Type);
-        Assert.Equal("Only in Processed", discrepancy.Detail);
+        Assert.Equal("Not in either RSVP export", discrepancy.Detail);
         Assert.Equal("Oscar Reid", discrepancy.HostDisplayName);
     }
 
