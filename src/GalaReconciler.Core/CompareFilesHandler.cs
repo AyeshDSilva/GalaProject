@@ -9,13 +9,17 @@ namespace GalaReconciler.Core;
 /// The separate Gala RSVP export ("RSVP - Attending" / "RSVP - Not attending"), compared with the master list's
 /// Grid Gala column. Without it, Grid Gala comes from the main export's "Grid Gala …" tickets as before.
 /// </param>
+/// <param name="MainGuestsOnlyInNotFound">
+/// Leave anyone who is a guest of someone out of "Guest not found". Guests who are found are still compared.
+/// </param>
 public sealed record CompareFilesRequest(
     Stream SourceFile,
     string SourceFileName,
     Stream ProcessedFile,
     string ProcessedFileName,
     Stream? GalaFile = null,
-    string? GalaFileName = null);
+    string? GalaFileName = null,
+    bool MainGuestsOnlyInNotFound = false);
 
 public sealed record ReconciliationResult(
     string SourceFileName,
@@ -50,6 +54,12 @@ public sealed class CompareFilesHandler(
 
         foreach (var pair in match.Matched)
         {
+            // Only a name in someone's Guest Name cell: being found is the whole check, and there's no row to compare.
+            if (pair.Processed.IsListedGuestOnly)
+            {
+                continue;
+            }
+
             var sort = SortKey.For(pair.Processed.MatchKey, pair.Processed.HostMatchKey ?? pair.Source.HostMatchKey);
             foreach (var rule in rules)
             {
@@ -63,9 +73,13 @@ public sealed class CompareFilesHandler(
         // Unmatched records only ever produce GuestNotFound. A "guest" in the master list's Guest Name column
         // (name not known yet) isn't reported when the export has no partner for it.
         var twoExports = request.GalaFile is not null;
-        items.AddRange(match.OnlyInSource.Select(u => (NotFound(u, inSource: true, twoExports), SortKey.For(u.Record))));
+        bool IsReported(UnmatchedGuest unmatched) =>
+            !request.MainGuestsOnlyInNotFound || (unmatched.Record.HostMatchKey is null && !unmatched.Record.IsUnnamedGuest);
+
+        items.AddRange(match.OnlyInSource.Where(IsReported).Select(u => (NotFound(u, inSource: true, twoExports), SortKey.For(u.Record))));
         items.AddRange(match.OnlyInProcessed
-            .Where(u => !u.Record.IsUnnamedGuest)
+            .Where(u => !u.Record.IsUnnamedGuest && !u.Record.IsListedGuestOnly)
+            .Where(IsReported)
             .Select(u => (NotFound(u, inSource: false, twoExports), SortKey.For(u.Record))));
 
         var ordered = items

@@ -54,7 +54,7 @@ public sealed class CliApp(CompareFilesHandler handler, TextWriter output)
             using var gala = new MemoryStream(inputs.Gala.Contents, writable: false);
             using var processed = new MemoryStream(inputs.Processed.Contents, writable: false);
             var result = handler.Handle(new CompareFilesRequest(
-                source, inputs.Source.Name, processed, inputs.Processed.Name, gala, inputs.Gala.Name));
+                source, inputs.Source.Name, processed, inputs.Processed.Name, gala, inputs.Gala.Name, MainGuestsOnlyInNotFound: true));
 
             // Two new files; the originals are only ever read.
             var paths = OutputPaths.For(options.Output, currentDirectory, folder, result.RunAt, inputs.Processed.Name);

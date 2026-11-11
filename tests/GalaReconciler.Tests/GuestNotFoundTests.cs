@@ -13,7 +13,7 @@ public class GuestNotFoundTests
         using var galaFile = new WorkbookBuilder().AddGalaSheet("attendee-report", gala).ToStream();
         using var processed = new WorkbookBuilder().AddProcessedSheet("Sheet1", master).ToStream();
         return TestHandlers.CreateConsoleCompareFilesHandler().Handle(
-            new CompareFilesRequest(source, "s", processed, "p", galaFile, "g"));
+            new CompareFilesRequest(source, "s", processed, "p", galaFile, "g", MainGuestsOnlyInNotFound: true));
     }
 
     private static List<Discrepancy> NotFound(ReconciliationResult result) =>
@@ -149,5 +149,121 @@ public class GuestNotFoundTests
             new ProcessedGuest("Maeve", "Connell") { GridGala = "Y" });
 
         Assert.Equal("Not in either RSVP export", Assert.Single(NotFound(result)).Detail);
+    }
+
+    [Fact]
+    public void Someone_with_their_own_ticket_is_found_in_the_guest_name_column()
+    {
+        // Bought their own ticket, so the export doesn't say they're a guest; the master list only names them here.
+        var result = Compare(
+            [new SourceTicket("Saturday attending", "Tharushi", "Ediriweera", "O1") { Title = "Mrs", Mobile = "0491 570 111", Email = "t@example.com", PositionTitle = "Manager" }],
+            [new SourceTicket("RSVP - Attending", "Other", "Person", "G1")],
+            new ProcessedGuest("Marco", "Bellini") { Sat = "Y", GuestName = "Mrs Tharushi Ediriweera" },
+            new ProcessedGuest("Other", "Person") { GridGala = "Y" });
+
+        // Found, and nothing else is flagged: there's no row of hers to compare with. Marco has no ticket and is the only not-found.
+        Assert.Equal("Marco Bellini", Assert.Single(result.Discrepancies).GuestDisplayName);
+        Assert.Equal(DiscrepancyType.GuestNotFound, Assert.Single(result.Discrepancies).Type);
+    }
+
+    [Fact]
+    public void Guest_name_entries_with_no_ticket_are_not_reported()
+    {
+        var result = Compare(
+            [new SourceTicket("Saturday attending", "Marco", "Bellini", "O1")],
+            [new SourceTicket("RSVP - Attending", "Marco", "Bellini", "G1")],
+            new ProcessedGuest("Marco", "Bellini") { Sat = "Y", GridGala = "Y", GuestName = "Mrs Tharushi Ediriweera" });
+
+        Assert.Empty(result.Discrepancies);
+    }
+
+    [Fact]
+    public void Web_registration_also_finds_people_in_the_guest_name_column_without_reporting_the_rest()
+    {
+        using var source = new WorkbookBuilder().AddSourceSheet("RSVP", new SourceTicket("Saturday attending", "Tharushi", "Ediriweera", "O1")).ToStream();
+        using var processed = new WorkbookBuilder().AddProcessedSheet(
+            "Sheet1",
+            new ProcessedGuest("Marco", "Bellini") { GuestName = "Mrs Tharushi Ediriweera\nMr Nobody Here" }).ToStream();
+
+        var result = TestHandlers.CreateCompareFilesHandler().Handle(new CompareFilesRequest(source, "s", processed, "p"));
+
+        Assert.DoesNotContain(result.Discrepancies, d => d.GuestDisplayName is "Tharushi Ediriweera" or "Nobody Here");
+    }
+
+    [Fact]
+    public void An_extra_ticket_pairs_with_a_name_in_the_guest_name_column()
+    {
+        var result = Compare(
+            [
+                new SourceTicket("Saturday attending", "Marco", "Bellini", "O1"),
+                new SourceTicket("Saturday attending", "Marco", "Bellini", "O1"),
+            ],
+            [new SourceTicket("RSVP - Attending", "Other", "Person", "G1")],
+            new ProcessedGuest("Marco", "Bellini") { Sat = "Y", GuestName = "Mrs Tharushi Ediriweera" },
+            new ProcessedGuest("Other", "Person") { GridGala = "Y" });
+
+        Assert.Empty(result.Discrepancies);
+    }
+
+    [Fact]
+    public void Guests_of_someone_are_left_out_on_both_sides()
+    {
+        var result = Compare(
+            [
+                new SourceTicket("Saturday attending", "Host", "Person", "O1"),
+                new SourceTicket("Saturday attending", "Bought", "Forguest", "O1") { BuyerFirstName = "Host", BuyerLastName = "Person" },
+                new SourceTicket("Sunday attending", "Host", "Person", "O2"),
+                new SourceTicket("Sunday attending", "Host", "Person", "O2"),
+            ],
+            [new SourceTicket("RSVP - Attending", "Other", "Person", "G1")],
+            new ProcessedGuest("Host", "Person") { Sat = "Y", Sun = "Y" },
+            new ProcessedGuest("Listed", "Guest") { Sat = "Y", Position = "Guest of Mr Other Person" },
+            new ProcessedGuest("Other", "Person") { GridGala = "Y", GuestName = "Mr Named Guest" },
+            new ProcessedGuest("Named", "Guest") { GridGala = "Y" });
+
+        // "Bought Forguest" and the extra ticket on the export side; "Listed Guest" and "Named Guest" on the master list.
+        Assert.Empty(NotFound(result));
+    }
+
+    [Fact]
+    public void Main_guests_are_still_reported_on_both_sides()
+    {
+        var result = Compare(
+            [new SourceTicket("Saturday attending", "Sam", "Fletcher", "O1")],
+            [new SourceTicket("RSVP - Attending", "Other", "Person", "G1")],
+            new ProcessedGuest("Other", "Person") { GridGala = "Y" },
+            new ProcessedGuest("Ruby", "McIntyre") { Sat = "Y" });
+
+        Assert.Equal(["Ruby McIntyre", "Sam Fletcher"], NotFound(result).Select(d => d.GuestDisplayName).Order());
+    }
+
+    [Fact]
+    public void A_found_guest_is_still_compared()
+    {
+        var result = Compare(
+            [
+                new SourceTicket("Saturday attending", "Host", "Person", "O1"),
+                new SourceTicket("Saturday attending", "Clara", "Walsh", "O1") { BuyerFirstName = "Host", BuyerLastName = "Person" },
+            ],
+            [new SourceTicket("RSVP - Attending", "Other", "Person", "G1")],
+            new ProcessedGuest("Host", "Person") { Sat = "Y", GuestName = "Ms Clara Walsh" },
+            new ProcessedGuest("Clara", "Walsh") { Sat = "N", Position = "Guest of Mr Host Person" },
+            new ProcessedGuest("Other", "Person") { GridGala = "Y" });
+
+        Assert.Equal(DiscrepancyType.DatesMismatch, Assert.Single(result.Discrepancies).Type);
+    }
+
+    [Fact]
+    public void Without_the_setting_guests_are_still_reported()
+    {
+        using var source = new WorkbookBuilder().AddSourceSheet("RSVP", new SourceTicket("Saturday attending", "Host", "Person", "O1")).ToStream();
+        using var processed = new WorkbookBuilder().AddProcessedSheet(
+            "Sheet1",
+            new ProcessedGuest("Host", "Person") { Sat = "Y", GuestName = "Mr Named Guest" },
+            new ProcessedGuest("Named", "Guest") { Sat = "Y", Position = "Guest of Mr Host Person" }).ToStream();
+
+        var result = TestHandlers.CreateCompareFilesHandler().Handle(new CompareFilesRequest(source, "s", processed, "p"));
+
+        Assert.Equal("Named Guest", Assert.Single(NotFound(result)).GuestDisplayName);
     }
 }

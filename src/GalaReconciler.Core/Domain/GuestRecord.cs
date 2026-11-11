@@ -44,6 +44,12 @@ public sealed class GuestRecord
 
     public bool IsUnnamedGuest { get; init; }
 
+    /// <summary>
+    /// Named in a host's Guest Name cell in the master list, with no First Name / Surname row of their own. There's
+    /// only the name, so it's enough for them to be found; nothing else can be compared or reported.
+    /// </summary>
+    public bool IsListedGuestOnly { get; init; }
+
     public Dictionary<EventDay, AttendanceState> Attendance { get; } = [];
 
     public HashSet<string> Phones { get; } = new(StringComparer.Ordinal);

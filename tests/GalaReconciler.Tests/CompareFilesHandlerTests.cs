@@ -232,12 +232,18 @@ public class CompareFilesHandlerTests
     }
 
     [Fact]
-    public void Maeve_is_only_in_processed()
+    public void Maeve_is_a_guest_of_someone_so_she_is_not_reported_as_not_found()
     {
-        var discrepancy = Assert.Single(For("Maeve O'Connell"));
+        // In the master list only, but her Position says "Guest of Mr Mr Oscar Reid".
+        Assert.Empty(For("Maeve O'Connell"));
+    }
+
+    [Fact]
+    public void A_main_guest_in_the_master_list_only_is_still_reported()
+    {
+        var discrepancy = Assert.Single(For("Ruby McIntyre"));
         Assert.Equal(DiscrepancyType.GuestNotFound, discrepancy.Type);
         Assert.Equal("Not in either RSVP export", discrepancy.Detail);
-        Assert.Equal("Oscar Reid", discrepancy.HostDisplayName);
     }
 
     [Fact]
@@ -277,18 +283,18 @@ public class CompareFilesHandlerTests
     [Fact]
     public void Totals_and_ordering()
     {
-        Assert.Equal(15, Result.Discrepancies.Count);
+        Assert.Equal(14, Result.Discrepancies.Count);
         Assert.Equal(16, Result.SourceGuestCount);    // both exports together
         Assert.Equal(17, Result.ProcessedGuestCount); // including Ethan's and Luca's unnamed guests
         Assert.Equal(14, Result.MatchedCount);
         Assert.Equal("Gala.xlsx", Result.GalaFileName);
 
         // Ordered by name, with each guest grouped under their host (Clara after Henry, Leilani where Marco
-        // would be, Maeve where Oscar Reid would be), then by type.
+        // would be), then by type.
         Assert.Equal(
             [
                 "Ethan Cole", "Grace Huang", "Henry Walsh", "Clara Walsh", "Leilani Fonua",
-                "Olivia Grant-Taylor", "Olivia Grant-Taylor", "Olivia Grant-Taylor", "Maeve O'Connell", "Ruby Macintyre", "Ruby McIntyre", "Sam Fletcher", "Tom Baker", "William Hartley", "William Hartley",
+                "Olivia Grant-Taylor", "Olivia Grant-Taylor", "Olivia Grant-Taylor", "Ruby Macintyre", "Ruby McIntyre", "Sam Fletcher", "Tom Baker", "William Hartley", "William Hartley",
             ],
             Result.Discrepancies.Select(d => d.GuestDisplayName));
     }

@@ -111,7 +111,7 @@ Only the **first sheet** is read. Headers are matched **ignoring capitals**.
 | `THURS`, `FRI`, `SAT`, `SUN`, `Grid Gala` | yes | days (from `EventDays.All`) |
 | `First Name`, `Surname` | yes | name |
 | `Prenom`, `Postnom`, `Position` | yes | title, post nominal, position (or "Guest of …") |
-| `Guest Name` | yes | the host's list of guests |
+| `Guest Name` | yes | the host's guests. Every name here can be matched, even with no row of their own (`GuestRecord.IsListedGuestOnly`); for those, being found is the only check |
 | `Phone`, `Email 1` | yes | phones, emails |
 | `Email 2` | no | emails |
 | `Dietary`, `Accessibility` | yes | requirements (console app checks only), kept as written |
@@ -194,7 +194,7 @@ All cleaning is in `src/GalaReconciler.Core/Normalization/`. Test cases are in
 | `TextNormalizer` | Title, post nominal, position. `Clean` turns blanks and placeholders into "no value". `ComparisonKey` ignores case, full stops and spaces. | Add a word to `Placeholders` (e.g. `"-"` is already covered, `"pending"` isn't). Treat two titles as the same in `TitleMismatchRule.ComparisonKey` (Miss = Ms is there). |
 | `PhoneNormalizer` | Keeps digits only, turns `+61` into `0`, puts back a leading `0` that Excel dropped, splits cells on `/ , ; \|` and "or". | Support another country prefix; add a separator to `Separators()`. |
 | `EmailNormalizer` | Lower-cases and splits cells holding several addresses. | |
-| `NameNormalizer` | Builds the match key from first + last name, stripping leading titles (`Titles`: mr, mrs, ms, miss, dr, prof, sir, dame). | Add a title to `Titles` (lower case, e.g. `"hon"`) so "Hon Jane Smith" matches "Jane Smith". |
+| `NameNormalizer` | Builds the match key from first + last name, stripping leading titles (`Titles`: mr, mrs, ms, miss, mx, dr, prof, professor, sir, dame, lady, lord, the, hon, rev, cr). | Add a title to `Titles` (lower case, e.g. `"hon"`) so "Hon Jane Smith" matches "Jane Smith". |
 
 A change here affects **both files and both apps**, so it's the right place for "these two values should count
 as the same".
@@ -309,7 +309,7 @@ place your new type probably needs a line too.
 
 [GuestMatcher.cs](../src/GalaReconciler.Core/Matching/GuestMatcher.cs) does it in order:
 
-1. **Name**: the normalized "first last" key (`NameNormalizer.Key`). Changing how names are normalized changes
+1. **Name**: the normalized "first last" key (`NameNormalizer.Key`), against First Name + Surname and each name in Guest Name. Changing how names are normalized changes
    matching too.
 2. **Other names** (`GuestRecord.OtherMatchKeys`): the ticket holder name in columns B/C when it differs from the
    attendee name, and the other export's spelling. Runs after step 1 so an exact name always wins.
@@ -318,7 +318,8 @@ place your new type probably needs a line too.
    list names for X who has no ticket of their own. Phones and emails aren't compared for these pairs, since the ticket
    carries the host's details.
 5. **Leftovers** are "Guest not found". A name within `PossibleMatchMaxDistance` (2) letters on the other side is
-   suggested, never matched.
+   suggested, never matched. The console app reports main guests only (`MainGuestsOnlyInNotFound`): anyone with a host, or
+   an unnamed guest, is left out.
 
 Before matching, `SourceRsvpParser.UnifySpellingsAcrossExports` joins a Gala export person to the main export's when they
 share an email and `GuestMatcher.IsSimilarName` says the names are nearly the same (a shared email alone could be a

@@ -8,7 +8,7 @@ public static partial class NameNormalizer
 {
     private static readonly HashSet<string> Titles = new(StringComparer.Ordinal)
     {
-        "mr", "mrs", "ms", "miss", "dr", "prof", "sir", "dame",
+        "mr", "mrs", "ms", "miss", "mx", "dr", "prof", "professor", "sir", "dame", "lady", "lord", "the", "hon", "rev", "cr",
     };
 
     /// <summary>Match key for a person: normalized "first last".</summary>

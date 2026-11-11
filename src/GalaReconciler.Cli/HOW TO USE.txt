@@ -38,11 +38,13 @@ The highlighted copy of the master list
 It is your master list exactly as it was, with:
   Yellow cells   A value that differs from the RSVP export. The Differences sheet of the results
                  workbook shows the RSVP export's value and this list's value.
-  Red names      First Name and Surname of people who are not in the RSVP export at all.
-                 A "guest" in the Guest Name column (name not known yet) is never marked as missing.
+  Red names      First Name and Surname of main guests who are not in either RSVP export.
+                 Anyone who is a guest of someone is never marked as missing.
 
 People who are only in the RSVP exports can't be highlighted here (they have no row); they are listed in
-the results workbook as "Guest not found". The Details column says which export they were found in.
+the results workbook as "Guest not found", main guests only. People are looked for under First Name and
+Surname and in the Guest Name column ("Mrs Jane Smith" is fine). The Details column says which export they
+were found in.
 
 
 What is compared

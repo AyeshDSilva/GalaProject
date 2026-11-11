@@ -81,7 +81,7 @@ public static partial class TestHandlers
         using var gala = SampleWorkbookBuilder.Gala().ToStream();
         using var processed = SampleWorkbookBuilder.Processed().ToStream();
         return CreateConsoleCompareFilesHandler().Handle(
-            new CompareFilesRequest(source, "Source.xlsx", processed, "Processed.xlsx", gala, "Gala.xlsx"));
+            new CompareFilesRequest(source, "Source.xlsx", processed, "Processed.xlsx", gala, "Gala.xlsx", MainGuestsOnlyInNotFound: true));
     }
 
     /// <summary>Posts both files through the real upload form and returns the run page URL it redirects to.</summary>

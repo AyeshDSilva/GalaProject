@@ -114,11 +114,58 @@ public class ProcessedGuestListParserTests
     public void Warns_about_inconsistent_guest_links()
     {
         var result = Parse(
-            new ProcessedGuest("Marco", "Bellini") { GuestName = "Ms Leilani Fonua\nMr Nobody Here" },
+            new ProcessedGuest("Marco", "Bellini") { GuestName = "Ms Leilani Fonua" },
             new ProcessedGuest("Leilani", "Fonua") { Position = "Guest of Mr Someone Else" });
 
-        Assert.Contains(result.Warnings, w => w.Message.Contains("Nobody Here"));
         Assert.Contains(result.Warnings, w => w.Message.Contains("Someone Else"));
+    }
+
+    [Fact]
+    public void A_name_only_in_the_guest_name_column_is_a_guest_of_that_host()
+    {
+        var result = Parse(new ProcessedGuest("Marco", "Bellini") { GuestName = "Mrs Tharushi Ediriweera" });
+
+        var guest = Assert.Single(result.Records, r => r.IsListedGuestOnly);
+        Assert.Equal("Tharushi Ediriweera", guest.DisplayName);
+        Assert.Equal("tharushi ediriweera", guest.MatchKey);
+        Assert.Equal("marco bellini", guest.HostMatchKey);
+        Assert.Equal("Marco Bellini", guest.HostDisplayName);
+        Assert.Empty(result.Warnings);
+    }
+
+    [Theory]
+    [InlineData("Mrs Ann Lee\nMr Tom Lee")]
+    [InlineData("Mrs Ann Lee, Mr Tom Lee")]
+    [InlineData("Mrs Ann Lee; Mr Tom Lee")]
+    [InlineData("Mrs Ann Lee & Mr Tom Lee")]
+    [InlineData("Mrs Ann Lee and Mr Tom Lee")]
+    public void One_guest_name_cell_can_hold_several_guests(string cell)
+    {
+        var result = Parse(new ProcessedGuest("Marco", "Bellini") { GuestName = cell });
+
+        Assert.Equal(["ann lee", "tom lee"], result.Records.Where(r => r.IsListedGuestOnly).Select(r => r.MatchKey));
+    }
+
+    [Theory]
+    [InlineData("nil")]
+    [InlineData("-")]
+    [InlineData("TBC")]
+    public void Placeholders_in_guest_name_are_not_guests(string cell)
+    {
+        var result = Parse(new ProcessedGuest("Marco", "Bellini") { GuestName = cell });
+
+        Assert.DoesNotContain(result.Records, r => r.IsListedGuestOnly);
+    }
+
+    [Fact]
+    public void A_guest_with_their_own_row_keeps_that_row()
+    {
+        var result = Parse(
+            new ProcessedGuest("Marco", "Bellini") { GuestName = "Ms Leilani Fonua" },
+            new ProcessedGuest("Leilani", "Fonua") { Position = "Guest of Mr Marco Bellini" });
+
+        Assert.DoesNotContain(result.Records, r => r.IsListedGuestOnly);
+        Assert.Equal(2, result.Records.Count);
     }
 
     [Fact]

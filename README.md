@@ -54,13 +54,15 @@ kept) with every difference marked on its own row:
 | Mark | Meaning |
 |---|---|
 | Yellow cell | The value differs from the RSVP export (the Differences sheet in the results gives both values). Marked cells: the day columns, Prenom, Postnom, Position, Phone, Email 1/Email 2, Dietary, Accessibility. |
-| Red First Name and Surname | The person isn't in the RSVP export (the results give a possible match if there's a similar name). A `guest` in Guest Name (name not known yet) is never reported as missing; it's only compared when the export has an extra ticket for it. |
+| Red First Name and Surname | A main guest who isn't in either RSVP export (the results give a possible match if there's a similar name). Anyone who is a guest of someone is never marked as missing. |
+
+"Guest not found" lists **main guests only** in the console app: anyone who is a guest of someone (a "Guest of …" Position, listed in a Guest Name cell, a ticket bought by another attendee, or an extra ticket under the host's name) is left out. Guests who are found are still compared.
 
 People only in the exports have no row to mark; they're listed in the results as "Guest not found". The Details column
 says where they were found: "Only in RSVP export", "Only in Gala RSVP export" or "In both RSVP exports, not in the
 master list". People in the master list but neither export say "Not in either RSVP export".
 
-Before someone is reported, the app tries, in order: their name; the name in columns B/C if the attendee name differs;
+Before someone is reported, the app tries, in order: their name against the master list's First Name + Surname and every name in the Guest Name column (titles such as "Mrs" are ignored, and one cell can hold several guests); the name in columns B/C if the attendee name differs;
 a shared email (only when exactly one person on each side has it); and, for a second ticket under the same name on one
 order, a guest the master list names for that host. If the two exports spell a person differently but give the same
 email and nearly the same name, they count as one person and the Warnings sheet says so.

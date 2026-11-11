@@ -174,11 +174,11 @@ public sealed class ExcelReportWriterTests : IDisposable
         Assert.Equal("Gala.xlsx", ValueFor("Gala file"));
         Assert.Equal("Processed.xlsx", ValueFor("Processed file"));
         Assert.Equal("14", ValueFor("Matched"));
-        Assert.Equal("4", ValueFor("Guest not found"));
+        Assert.Equal("3", ValueFor("Guest not found"));
         Assert.Equal("3", ValueFor("Dates mismatch"));
         Assert.Equal("1", ValueFor("Dietary mismatch"));
         Assert.Equal("1", ValueFor("Accessibility mismatch"));
-        Assert.Equal("15", ValueFor("Total"));
+        Assert.Equal("14", ValueFor("Total"));
         Assert.Equal("1", ValueFor("Mobile mismatch"));
         Assert.Equal("1", ValueFor("Position mismatch"));
         Assert.Equal("1", ValueFor("Warnings"));
@@ -192,7 +192,7 @@ public sealed class ExcelReportWriterTests : IDisposable
 
         var table = sheet.Tables.Single();
         Assert.True(table.ShowAutoFilter);
-        Assert.Equal(15, table.DataRange.RowCount());
+        Assert.Equal(14, table.DataRange.RowCount());
         Assert.Equal(
             ["Type", "Guest", "Name in Source", "Guest of", "Details", "Possible match", "Matched by", "Source", "Processed",
              "Thu", "Fri", "Sat", "Sun", "Gala", "Source location", "Processed location"],
@@ -289,11 +289,11 @@ public sealed class CliAppTests : IDisposable
         Assert.Contains("Gala file:      Gala RSVP.xlsx", text);
         Assert.Contains("Processed file: Master list.xlsx", text);
         Assert.Contains(
-            "15 differences: 4 guest not found, 3 dates mismatch, 1 mobile mismatch, 2 email mismatch, 1 title mismatch, 1 post nominal mismatch, 1 position mismatch, 1 dietary mismatch, 1 accessibility mismatch",
+            "14 differences: 3 guest not found, 3 dates mismatch, 1 mobile mismatch, 2 email mismatch, 1 title mismatch, 1 post nominal mismatch, 1 position mismatch, 1 dietary mismatch, 1 accessibility mismatch",
             text);
         Assert.Contains("Results saved:", text);
         Assert.Contains("Highlighted master list:", text);
-        Assert.Contains("(15 cells highlighted; the original files were not changed)", text);
+        Assert.Contains("(13 cells highlighted; the original files were not changed)", text);
     }
 
     [Fact]
@@ -317,7 +317,7 @@ public sealed class CliAppTests : IDisposable
         var text = _output.ToString();
         Assert.Contains("Source file:    RSVP export.xlsx", text);
         Assert.Contains("Gala file:      Gala RSVP.xlsx", text);
-        Assert.Contains("15 differences", text);
+        Assert.Contains("14 differences", text);
         Assert.True(File.Exists(_folder.File("out.xlsx")));
         Assert.True(File.Exists(_folder.File("out - Master list (highlighted).xlsx")));
     }
@@ -406,8 +406,8 @@ public sealed class ProcessedFileHighlighterTests : IDisposable
         var sheet = workbook.Worksheet(1);
         var yellow = ProcessedFileHighlighter.ChangedFill;
 
-        // Rows: 3 Leilani, 5 Olivia, 7 Ethan, 10 Maeve, 11 Henry, 12 Clara, 14 William, 15 Ruby McIntyre, 16 Grace, 17 Tom.
-        Assert.Equal(15, count);
+        // Rows: 3 Leilani, 5 Olivia, 7 Ethan, 11 Henry, 12 Clara, 14 William, 15 Ruby McIntyre, 16 Grace, 17 Tom.
+        Assert.Equal(13, count);
 
         // Dietary and accessibility.
         Assert.Equal(yellow, Cell(sheet, 5, "Dietary").Style.Fill.BackgroundColor);        // Olivia: "No dairy" missing
@@ -434,9 +434,11 @@ public sealed class ProcessedFileHighlighterTests : IDisposable
         Assert.False(IsMarked(Cell(sheet, 16, "Grid Gala"))); // Grace: not attending and N agree
         Assert.False(IsMarked(Cell(sheet, 13, "Grid Gala"))); // Felix: attending and Y agree
 
-        // In the master list but not the export: name in red.
-        Assert.Equal(ProcessedFileHighlighter.NotInExportFill, Cell(sheet, 10, "First Name").Style.Fill.BackgroundColor);
+        // In the master list but not the export: name in red, for main guests only.
+        Assert.Equal(ProcessedFileHighlighter.NotInExportFill, Cell(sheet, 15, "First Name").Style.Fill.BackgroundColor);
         Assert.Equal(ProcessedFileHighlighter.NotInExportFill, Cell(sheet, 15, "Surname").Style.Fill.BackgroundColor);
+        Assert.False(IsMarked(Cell(sheet, 10, "First Name"))); // Maeve: guest of Oscar Reid
+        Assert.False(IsMarked(Cell(sheet, 10, "Surname")));
     }
 
     [Fact]

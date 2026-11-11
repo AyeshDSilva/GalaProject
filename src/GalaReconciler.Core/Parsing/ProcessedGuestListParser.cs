@@ -252,12 +252,30 @@ public sealed partial class ProcessedGuestListParser
                 }
             }
 
-            // Named guests: cross-check against each guest's own "Guest of …" Position.
+            // Named guests ("Mrs Tharushi Ediriweera"): many only appear here, with no row of their own, so the
+            // name alone makes them someone the exports can be matched to. Those who do have a row are
+            // cross-checked against their own "Guest of …" Position.
             foreach (var name in guestList.Named)
             {
-                if (!byKey.TryGetValue(NameNormalizer.Normalize(name), out var guest))
+                var guestKey = NameNormalizer.Normalize(name);
+                if (TextNormalizer.Clean(name) is null || guestKey.Length == 0)
                 {
-                    warnings.Add(new(WarningFile, $"{host.DisplayName} lists '{name}' under Guest Name, but there is no row for them."));
+                    continue;
+                }
+
+                if (!byKey.TryGetValue(guestKey, out var guest))
+                {
+                    guest = new GuestRecord
+                    {
+                        DisplayName = NameNormalizer.StripTitles(name),
+                        MatchKey = guestKey,
+                        HostDisplayName = host.DisplayName,
+                        HostMatchKey = hostKey,
+                        IsListedGuestOnly = true,
+                    };
+                    guest.Rows.AddRange(host.Rows);
+                    byKey[guestKey] = guest;
+                    records.Add(guest);
                     continue;
                 }
 
@@ -267,7 +285,9 @@ public sealed partial class ProcessedGuestListParser
                 }
                 else if (guest.HostMatchKey != hostKey)
                 {
-                    warnings.Add(new(WarningFile, $"{guest.DisplayName}'s Position says Guest of {guest.HostDisplayName}, but {host.DisplayName} lists them under Guest Name."));
+                    warnings.Add(new(WarningFile, guest.IsListedGuestOnly
+                        ? $"{guest.DisplayName} is listed under Guest Name for both {guest.HostDisplayName} and {host.DisplayName}."
+                        : $"{guest.DisplayName}'s Position says Guest of {guest.HostDisplayName}, but {host.DisplayName} lists them under Guest Name."));
                 }
             }
         }
@@ -312,10 +332,14 @@ public sealed partial class ProcessedGuestListParser
     }
 
     private static List<string> SplitLines(string cell) =>
-        cell.Split(['\r', '\n', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        GuestNameSeparators().Split(cell)
             .Select(NameNormalizer.CleanDisplay)
             .Where(line => line.Length > 0)
             .ToList();
+
+    // One cell can hold several guests: on separate lines, or "Mrs A Smith, Mr B Jones", "… & …", "… and …".
+    [GeneratedRegex(@"[\r\n;,&]+|\s+and\s+", RegexOptions.IgnoreCase)]
+    private static partial Regex GuestNameSeparators();
 
     [GeneratedRegex(@"^\s*guest\s+of\s+(.+?)\s*$", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex GuestOf();
